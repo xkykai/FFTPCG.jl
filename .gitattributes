@@ -1,0 +1,20 @@
+# Normalize line endings: store as LF in the repo, check out native on each OS.
+# This makes CRLF/LF differences invisible to git regardless of platform.
+* text=auto
+
+# Force LF for files that should never have CRLF (scripts, source, config).
+*.jl    text eol=lf
+*.toml  text eol=lf
+*.md    text eol=lf
+*.sh    text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+
+# Treat these as binary so git never touches their line endings.
+*.png   binary
+*.jpg   binary
+*.gif   binary
+*.pdf   binary
+*.jld2  binary
+*.nc    binary
+*.mp4   binary
