@@ -194,11 +194,11 @@ u_outlet(y, z, t) = -U₀_out
 # Colorbar(fig[1, 2], hm; label = "Area (m²)")
 # display(fig)
 #%%
-v_inlet_bc = OpenBoundaryCondition(v_inflow_profile; scheme=PerturbationAdvection())
+v_inlet_bc = NormalFlowBoundaryCondition(v_inflow_profile; scheme=PerturbationAdvection())
 b_inlet_bc = ValueBoundaryCondition(b_inflow_profile)
 # c_inlet_bc = ValueBoundaryCondition(c_inflow_profile)
 
-u_west_outlet_bc = OpenBoundaryCondition(u_outlet; scheme=PerturbationAdvection())
+u_west_outlet_bc = NormalFlowBoundaryCondition(u_outlet; scheme=PerturbationAdvection())
 
 @inline u_quadratic_drag(x, y, z, t, u, v) = - Cd * u * sqrt(u^2 + v^2)
 @inline v_quadratic_drag(x, y, z, t, u, v) = - Cd * v * sqrt(u^2 + v^2)
