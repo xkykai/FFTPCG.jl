@@ -2,7 +2,7 @@ using Oceananigans
 using Oceananigans.Models.NonhydrostaticModels: ConjugateGradientPoissonSolver, FFTBasedPoissonSolver
 using Oceananigans.Grids: with_number_type
 using Interpolations: linear_interpolation, Line
-# using CairoMakie
+using CairoMakie
 
 #####
 ##### Roughness topography
@@ -41,6 +41,12 @@ function stretched_tanh(x, a, b, c, d, f, g)
 end
 
 #%%
+# a = 15
+# b = 15
+# c = 1 / 512
+# d = 1 / 128
+# f = 0.15
+# g = 0.35
 # xs = range(0, 1, length=100)
 # hs = stretched_tanh.(xs, a, b, c, d, f, g)
 
@@ -49,7 +55,6 @@ end
 # lines!(ax, xs, hs)
 # fig
 #%%
-
 function stretched_grid_from_spacing(h, a, b, N; M=10_000)
     # Fine auxiliary grid
     xfine = range(a, b, length=M)
@@ -78,6 +83,8 @@ function stretched_grid_from_spacing(h, a, b, N; M=10_000)
 end
 
 #%%
+# h(z) = stretched_tanh(z, a, b, c, d, f, g)
+# x = stretched_grid_from_spacing(h, 0, 1, 256)
 # dx = diff(x)
 # extrema(dx)
 # #%%
@@ -103,7 +110,6 @@ end
 #     grid = setup_grid(; Nr=16)
 
 function setup_grid(; Nr, arch = GPU(), N = 512)
-
     Lx = 1
     Lz = 1
     Nx = N
@@ -143,12 +149,12 @@ function setup_stretched_grid(; Nr, arch = GPU(), Nx = 512, Nz = 256)
     # boundary layers and roughness live) and coarser spacing in the interior.
     # Only the ratio d/c matters, since stretched_grid_from_spacing normalizes
     # the cumulative density.
-    a = 50
-    b = 50
+    a = 15
+    b = 15
     c = 1 / (2Nz)
     d = 1 / (Nz/2)
-    f = 0.05
-    g = 0.45
+    f = 0.15
+    g = 0.35
 
     h(z) = stretched_tanh(z, a, b, c, d, f, g)
 
