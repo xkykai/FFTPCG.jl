@@ -149,7 +149,7 @@ end
     xwall = compute_xwall(x)
     zstar = compute_zstar(z, xwall)
     Fstar = F(zstar)
-    return ifelse(Fstar != 0, 1, 0)
+    return ifelse(Fstar < 1, 1, 0)
 end
 
 @inline function bathymetry_aware_v_inlet_profile(x, y, z)
@@ -164,7 +164,7 @@ set!(inlet_field, bathymetry_aware_v_inlet_profile)
 
 inlet_mass_flux_total = Field(Integral(inlet_field))
 
-Array(interior(inlet_mass_flux_total, 1, 1, 1))[1]
+const inlet_transport = Array(interior(inlet_mass_flux_total, 1, 1, 1))[1]
 #%%
 # fig = Figure()
 # ax = Axis(fig[1, 1]; title = "Inlet v profile", xlabel = "x (m)", ylabel = "z (m)")
@@ -184,7 +184,7 @@ set!(west_wall_field, west_wall_mask)
 
 outlet_area = Field(Integral(west_wall_field))
 
-const U₀_out = abs(Array(interior(inlet_mass_flux_total, 1, 1, 1))[1] / Array(interior(outlet_area, 1, 1, 1))[1])
+const U₀_out = abs(inlet_transport / Array(interior(outlet_area, 1, 1, 1))[1])
 
 u_outlet(y, z, t) = -U₀_out
 #%%
@@ -194,52 +194,23 @@ u_outlet(y, z, t) = -U₀_out
 # Colorbar(fig[1, 2], hm; label = "Area (m²)")
 # display(fig)
 #%%
-v_inlet_bc = NormalFlowBoundaryCondition(v_inflow_profile; scheme=PerturbationAdvection())
+v_inlet_bc = NormalFlowBoundaryCondition(v_inflow_profile; scheme=PerturbationAdvection(target_transport=inlet_transport))
 b_inlet_bc = ValueBoundaryCondition(b_inflow_profile)
-# c_inlet_bc = ValueBoundaryCondition(c_inflow_profile)
+c_inlet_bc = ValueBoundaryCondition(c_inflow_profile)
 
-u_west_outlet_bc = NormalFlowBoundaryCondition(u_outlet; scheme=PerturbationAdvection())
+u_west_outlet_bc = NormalFlowBoundaryCondition(u_outlet; scheme=PerturbationAdvection(target_transport=inlet_transport))
 
-@inline u_quadratic_drag(x, y, z, t, u, v) = - Cd * u * sqrt(u^2 + v^2)
-@inline v_quadratic_drag(x, y, z, t, u, v) = - Cd * v * sqrt(u^2 + v^2)
-
-@inline u_quadratic_bottom_drag(x, y, t, u, v) = u_quadratic_drag(x, y, nothing, t, u, v)
-@inline v_quadratic_bottom_drag(x, y, t, u, v) = v_quadratic_drag(x, y, nothing, t, u, v)
-
-u_quadratic_bottom_drag_bc = FluxBoundaryCondition(u_quadratic_bottom_drag, field_dependencies=(:u, :v))
-v_quadratic_bottom_drag_bc = FluxBoundaryCondition(v_quadratic_bottom_drag, field_dependencies=(:u, :v))
-
-@inline function immersed_u_boundary_condition(x, y, z, t, u, v)
-    within_embayment = y >= 0
-    return ifelse(within_embayment, zero(u), u_quadratic_drag(x, y, z, t, u, v))
-end
-
-@inline function immersed_v_boundary_condition(x, y, z, t, u, v)
-    within_embayment = y >= 0
-    return ifelse(within_embayment, zero(v), v_quadratic_drag(x, y, z, t, u, v))
-end
-
-immersed_u_bc = FluxBoundaryCondition(immersed_u_boundary_condition, field_dependencies=(:u, :v))
-immersed_v_bc = FluxBoundaryCondition(immersed_v_boundary_condition, field_dependencies=(:u, :v))
+quadratic_drag = BulkDrag(coefficient = Cd)
 
 no_slip_bc = ValueBoundaryCondition(0)
-no_flux_bc = FluxBoundaryCondition(0)
 
-u_bcs = FieldBoundaryConditions(immersed=immersed_u_bc, bottom=u_quadratic_bottom_drag_bc, north=no_slip_bc, west=u_west_outlet_bc)
-v_bcs = FieldBoundaryConditions(immersed=immersed_v_bc, bottom=v_quadratic_bottom_drag_bc, north=v_inlet_bc)
+u_bcs = FieldBoundaryConditions(immersed=quadratic_drag, bottom=quadratic_drag, north=no_slip_bc, west=u_west_outlet_bc)
+v_bcs = FieldBoundaryConditions(immersed=quadratic_drag, bottom=quadratic_drag, north=v_inlet_bc)
 w_bcs = FieldBoundaryConditions(north=no_slip_bc)
 b_bcs = FieldBoundaryConditions(north=b_inlet_bc)
-# c_bcs = FieldBoundaryConditions(north=c_inlet_bc)
+c_bcs = FieldBoundaryConditions(north=c_inlet_bc)
 
-# boundary_conditions = (u = u_bcs, v = v_bcs, w = w_bcs, b = b_bcs, c = c_bcs)
-boundary_conditions = (u = u_bcs, v = v_bcs, w = w_bcs, b = b_bcs)
-#%%
-@inline c_inlet(x, y, z, t) = ifelse(y >= 0, 1, 0)
-inlet_mask = GaussianMask{:y}(center=y₁, width= y₁/10)
-c_restoring_rate = abs(U₀) / Δy / 10
-c_forcing = Relaxation(rate=c_restoring_rate, mask=inlet_mask, target=c_inlet)
-
-forcing = (; c = c_forcing)
+boundary_conditions = (u = u_bcs, v = v_bcs, w = w_bcs, b = b_bcs, c = c_bcs)
 #%%
 if SOLVER == "CG"
     pressure_solver = ConjugateGradientPoissonSolver(grid)
@@ -252,7 +223,7 @@ end
 coriolis = FPlane(; f= f₀)
 #%%
 simulation_length = 14
-filename = "dense_overflow_c_forcing_Nx_$(Nx)_Ny_$(Ny)_Nz_$(Nz)_$(pressure_solver_str)_nu4h_$(ν₄h)_nu4z_$(ν₄z)_$(simulation_length)days"
+filename = "dense_overflow_Nx_$(Nx)_Ny_$(Ny)_Nz_$(Nz)_$(pressure_solver_str)_nu4h_$(ν₄h)_nu4z_$(ν₄z)_$(simulation_length)days"
 
 FILE_DIR = "./Data/$(filename)"
 mkpath(FILE_DIR)
@@ -267,8 +238,7 @@ model = NonhydrostaticModel(grid; pressure_solver,
                             coriolis,
                             closure,
                             buoyancy = BuoyancyTracer(),
-                            boundary_conditions,
-                            forcing)
+                            boundary_conditions)
 #%%
 @inline b_background(x, y, z, t) = b₀ + N^2 * z
 bᵢ(x, y, z) = b_background(x, y, z, nothing) + rand() * 1e-5 * abs(N^2 * Lz)
