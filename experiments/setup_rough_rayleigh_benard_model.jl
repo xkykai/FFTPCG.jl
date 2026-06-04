@@ -1,7 +1,7 @@
 using Oceananigans
 using Oceananigans.Models.NonhydrostaticModels: ConjugateGradientPoissonSolver, FFTBasedPoissonSolver
 using Oceananigans.Grids: with_number_type
-using Interpolations
+using Interpolations: linear_interpolation, Line
 # using CairoMakie
 
 #####
