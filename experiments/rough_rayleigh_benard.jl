@@ -100,7 +100,7 @@ if solver_type == "FFT"
     pressure_solver = nothing
     pressure_solver_str = solver_type
 elseif solver_type == "CG"
-    preconditioner = nonhydrostatic_pressure_solver(arch, with_number_type(Float32, grid.underlying_grid))
+    preconditioner = nonhydrostatic_pressure_solver(with_number_type(Float32, grid.underlying_grid), nothing)
     pressure_solver = ConjugateGradientPoissonSolver(grid, maxiter=80; preconditioner)
     pressure_solver_str = solver_type
 end
