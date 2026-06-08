@@ -5,7 +5,6 @@ using Oceananigans.Models.NonhydrostaticModels: ConjugateGradientPoissonSolver, 
 using Oceananigans.Models.NonhydrostaticModels: nonhydrostatic_pressure_solver
 using Oceananigans.Solvers: DiagonallyDominantPreconditioner, ColumnwiseTridiagonalPreconditioner
 using Oceananigans.Grids: with_number_type
-using Oceananigans.DistributedComputations
 using Statistics
 using CUDA
 using BenchmarkTools
@@ -135,32 +134,49 @@ mkpath("./reports/")
 filename = "single_H100_timed_stretched.jld2"
 FILE_PATH = joinpath("./reports/", filename)
 
+# Check whether a key already exists in the output file (i.e. that
+# combination has already been benchmarked and can be skipped).
+function key_exists(file_path, key)
+    isfile(file_path) || return false
+    return jldopen(file_path, "r") do file
+        haskey(file, key)
+    end
+end
+
 warmup_nsteps = 50
 nsteps = 50
 
 for (N, Δt) in zip(Ns, Δts)
-    @info "Benchmarking FFT solver for N=$N"
-    grid = setup_grid(N)
-    pressure_solver = nothing
-    model = setup_model(grid, pressure_solver)
-    times_FFT = []
+    if key_exists(FILE_PATH, "$(N)/times/FFTstep")
+        @info "Skipping FFT solver for N=$N (already benchmarked)"
+    else
+        @info "Benchmarking FFT solver for N=$N"
+        grid = setup_grid(N)
+        pressure_solver = nothing
+        model = setup_model(grid, pressure_solver)
+        times_FFT = []
 
-    for step in 1:warmup_nsteps
-        time_step!(model, Δt)
+        for step in 1:warmup_nsteps
+            time_step!(model, Δt)
+        end
+
+        for step in 1:nsteps
+            t = @timed time_step!(model, Δt)
+            push!(times_FFT, t)
+        end
+
+        jldopen(FILE_PATH, "a") do file
+            file["$(N)/times/FFTstep"] = times_FFT
+        end
     end
 
-    for step in 1:nsteps
-        t = @timed time_step!(model, Δt)
-        push!(times_FFT, t)
-    end
-
-    jldopen(FILE_PATH, "a") do file
-        file["$(N)/times/FFTstep"] = times_FFT
-    end
-    
     preconditioners = ["no", "FFT64", "FFT32", "DiagonallyDominant", "ColumnwiseTridiagonal"]
 
     for precond_name in preconditioners
+        if key_exists(FILE_PATH, "$(N)/times/$(precond_name)")
+            @info "Skipping $precond_name preconditioner for N=$N (already benchmarked)"
+            continue
+        end
         @info "Benchmarking $precond_name preconditioner for N=$N"
         grid = nothing
         model = nothing
@@ -182,8 +198,6 @@ for (N, Δt) in zip(Ns, Δts)
         elseif precond_name == "ColumnwiseTridiagonal"
             preconditioner = ColumnwiseTridiagonalPreconditioner(grid)
         end
-
-        volume = grid.Δxᶜᵃᵃ * grid.Δyᵃᶜᵃ * grid.z.Δᵃᵃᶜ
 
         pressure_solver = ConjugateGradientPoissonSolver(grid, maxiter=10000; preconditioner)
 
