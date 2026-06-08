@@ -1,8 +1,9 @@
 using Oceananigans
 using Oceananigans.Models.NonhydrostaticModels: ConjugateGradientPoissonSolver, FFTBasedPoissonSolver
 using Oceananigans.Grids: with_number_type
-using Interpolations: linear_interpolation, Line
 # using CairoMakie
+
+include("../utils/construct_stretched_spacing.jl")
 
 #####
 ##### Roughness topography
@@ -17,86 +18,6 @@ using Interpolations: linear_interpolation, Line
         return 0
     end
 end
-
-#####
-##### Stretched grid generation
-#####
-"""
-    stretched_tanh(x, a, b, c, d, f, g)
-
-Return a smooth, localized profile based on the difference of two hyperbolic
-tangent transitions.
-
-Parameters:
-- `x`: coordinate at which to evaluate the profile.
-- `a`: steepness of the transition centered at `f`.
-- `b`: steepness of the transition centered at `g`.
-- `c`: baseline value outside the stretched interval.
-- `d`: elevated value inside the stretched interval.
-- `f`: center location of the first transition.
-- `g`: center location of the second transition.
-"""
-function stretched_tanh(x, a, b, c, d, f, g)
-    return c + (d - c) / 2 * (tanh(a * (x - f)) - tanh(b * (x - g)))
-end
-
-#%%
-# a = 15
-# b = 15
-# c = 1 / 512
-# d = 1 / 128
-# f = 0.15
-# g = 0.35
-# xs = range(0, 1, length=100)
-# hs = stretched_tanh.(xs, a, b, c, d, f, g)
-
-# fig = Figure(size=(800, 200))
-# ax = Axis(fig[1, 1], xlabel="x", ylabel="h(x)")
-# lines!(ax, xs, hs)
-# fig
-#%%
-function stretched_grid_from_spacing(h, a, b, N; M=10_000)
-    # Fine auxiliary grid
-    xfine = range(a, b, length=M)
-    hfine = h.(xfine)
-
-    # Grid density: larger where h is smaller
-    ρ = 1 ./ hfine
-
-    # Cumulative integral using trapezoidal rule
-    s = zeros(M)
-    for i in 2:M
-        dx = xfine[i] - xfine[i-1]
-        s[i] = s[i-1] + 0.5 * dx * (ρ[i] + ρ[i-1])
-    end
-
-    # Normalize cumulative coordinate to [0, 1]
-    s ./= s[end]
-
-    # Invert s(x): x(s)
-    interp = linear_interpolation(s, collect(xfine), extrapolation_bc=Line())
-
-    # Uniform points in computational space
-    ξ = range(0, 1, length=N)
-
-    return interp.(ξ)
-end
-
-#%%
-# h(z) = stretched_tanh(z, a, b, c, d, f, g)
-# x = stretched_grid_from_spacing(h, 0, 1, 256)
-# dx = diff(x)
-# extrema(dx)
-# #%%
-# fig = Figure(size=(1600, 100))
-# ax = Axis(fig[1, 1])
-# scatter!(ax, x, zeros(length(x)))
-# fig
-# #%%
-# fig = Figure(size=(800, 400))
-# ax = Axis(fig[1, 1], xlabel="x", ylabel="h(x)")
-# scatter!(ax, x[1:end-1], dx)
-# fig
 
 #####
 ##### Grid setup
