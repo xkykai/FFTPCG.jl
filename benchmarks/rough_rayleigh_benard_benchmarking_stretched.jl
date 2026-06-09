@@ -131,7 +131,7 @@ Ns = [16, 32, 64, 96, 128, 192, 256]
 Δts = [min(1 / 8N, (1/(8N)^2) / max(ν, κ)) / 3 for N in Ns]
 
 mkpath("./reports/")
-filename = "single_H100_timed_stretched.jld2"
+filename = "single_H100_stretched.jld2"
 FILE_PATH = joinpath("./reports/", filename)
 
 # Check whether a key already exists in the output file (i.e. that
