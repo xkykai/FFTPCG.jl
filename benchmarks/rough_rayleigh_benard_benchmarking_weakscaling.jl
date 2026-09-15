@@ -4,7 +4,7 @@ using Printf
 using JLD2
 using Oceananigans.Models.NonhydrostaticModels: ConjugateGradientPoissonSolver, FFTBasedPoissonSolver
 using Oceananigans.Models.NonhydrostaticModels: nonhydrostatic_pressure_solver
-using Oceananigans.Solvers: DiagonallyDominantPreconditioner
+using Oceananigans.Solvers: DiagonallyDominantPreconditioner, ColumnwiseTridiagonalPreconditioner
 using Oceananigans.Grids: with_number_type
 using Oceananigans.DistributedComputations
 using Statistics
@@ -25,8 +25,8 @@ function parse_commandline()
         arg_type = Int
         default = 1
       "--preconditioners"
-        help = "Comma-separated list drawn from FFT, no, FFT64, FFT32, MITgcm"
-        default = "FFT,no,FFT64,FFT32,MITgcm"
+        help = "Comma-separated list drawn from FFT, no, FFT64, FFT32, DiagonallyDominant, ColumnwiseTridiagonal"
+        default = "FFT,no,FFT64,FFT32,DiagonallyDominant,ColumnwiseTridiagonal"
     end
     return parse_args(s)
 end
@@ -159,8 +159,10 @@ function build_solver(grid, precond_name)
     elseif precond_name == "FFT32"
         reduced_precision_grid = with_number_type(Float32, grid.underlying_grid)
         preconditioner = nonhydrostatic_pressure_solver(reduced_precision_grid, nothing)
-    elseif precond_name == "MITgcm"
+    elseif precond_name == "DiagonallyDominant"
         preconditioner = DiagonallyDominantPreconditioner()
+    elseif precond_name == "ColumnwiseTridiagonal"
+        preconditioner = ColumnwiseTridiagonalPreconditioner(grid)
     end
 
     return ConjugateGradientPoissonSolver(grid, maxiter=10000; preconditioner)
