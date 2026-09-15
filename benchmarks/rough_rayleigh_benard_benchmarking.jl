@@ -3,7 +3,7 @@ using Printf
 using JLD2
 using Oceananigans.Models.NonhydrostaticModels: ConjugateGradientPoissonSolver, FFTBasedPoissonSolver
 using Oceananigans.Models.NonhydrostaticModels: nonhydrostatic_pressure_solver
-using Oceananigans.Solvers: DiagonallyDominantPreconditioner
+using Oceananigans.Solvers: DiagonallyDominantPreconditioner, ColumnwiseTridiagonalPreconditioner
 using Oceananigans.Grids: with_number_type
 using Statistics
 using CUDA
@@ -127,8 +127,10 @@ function build_solver(grid, precond_name)
     elseif precond_name == "FFT32"
         reduced_precision_grid = with_number_type(Float32, grid.underlying_grid)
         preconditioner = nonhydrostatic_pressure_solver(reduced_precision_grid, nothing)
-    elseif precond_name == "MITgcm"
+    elseif precond_name == "DiagonallyDominant"
         preconditioner = DiagonallyDominantPreconditioner()
+    elseif precond_name == "ColumnwiseTridiagonal"
+        preconditioner = ColumnwiseTridiagonalPreconditioner(grid)
     end
 
     return ConjugateGradientPoissonSolver(grid, maxiter=10000; preconditioner)
@@ -153,7 +155,7 @@ end
 warmup_nsteps = 50
 nsteps = 50
 
-preconditioners = ["FFT", "no", "FFT64", "FFT32", "MITgcm"]
+preconditioners = ["FFT", "no", "FFT64", "FFT32", "DiagonallyDominant", "ColumnwiseTridiagonal"]
 
 for (N, Δt) in zip(Ns, Δts), precond_name in preconditioners
     if key_exists(FILE_PATH, "$(N)/times/$(precond_name)")
