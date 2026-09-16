@@ -14,6 +14,9 @@ function parse_commandline()
         help = "Grid type: one of $(join(GRID_TYPES, ", "))"
         default = "isotropic"
         range_tester = in(GRID_TYPES)
+      "--N"
+        help = "Resolution to benchmark, defaulting to the whole sweep for the chosen grid"
+        arg_type = Int
       "--preconditioners"
         help = "Comma-separated list drawn from $(join(PRECONDITIONERS, ", "))"
         default = join(PRECONDITIONERS, ',')
@@ -27,7 +30,8 @@ preconditioners = split(args["preconditioners"], ',')
 
 arch = GPU()
 
-Ns = grid_type == "isotropic" ? [32, 64, 96, 128, 192, 256, 384, 512] : [16, 32, 64, 96, 128, 192, 256]
+sweep_Ns = grid_type == "isotropic" ? [32, 64, 96, 128, 192, 256, 384, 512] : [16, 32, 64, 96, 128, 192, 256]
+Ns = isnothing(args["N"]) ? sweep_Ns : [args["N"]]
 
 warmup_nsteps = 50
 nsteps = 50
