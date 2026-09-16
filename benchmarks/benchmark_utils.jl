@@ -1,7 +1,8 @@
 using CUDA
 using MPI
+using JLD2
 using Oceananigans
-using Oceananigans.DistributedComputations: Distributed
+using Oceananigans.DistributedComputations: Distributed, Partition, Equal
 using Oceananigans.Solvers: ConjugateGradientPoissonSolver
 
 communicator(arch::Distributed) = arch.communicator
@@ -14,6 +15,11 @@ gpu_state() = let dev = CUDA.NVML.Device(CUDA.uuid(CUDA.device()))
     (sm_clock = CUDA.NVML.clock_info(dev).sm,
      temperature = CUDA.NVML.temperature(dev),
      power = CUDA.NVML.power_usage(dev))
+end
+
+function benchmark_architecture()
+    MPI.Comm_size(MPI.COMM_WORLD) == 1 && return GPU()
+    return Distributed(GPU(); partition = Partition(x = Equal()), synchronized_communication = false)
 end
 
 """
@@ -55,4 +61,25 @@ function benchmark_time_steps!(model, Δt, nsteps; warmup = nsteps)
     elapsed = (time_ns() - t₀) * 1e-9
 
     return (; stats, iterations, elapsed, initial_state, final_state = gpu_state())
+end
+
+"""
+    save_benchmark!(file_path, results, name; prefix="")
+
+Write the timing `results` for preconditioner `name` into `file_path`, replacing any existing
+entry, under the keys `prefix * "times/" * name` and its `cg_iters` and `gpu_state` siblings.
+"""
+function save_benchmark!(file_path, results, name; prefix = "")
+    jldopen(file_path, "a") do file
+        for group in ("times", "cg_iters", "gpu_state")
+            key = "$prefix$group/$name"
+            haskey(file, key) && delete!(file, key)
+        end
+
+        file["$(prefix)times/$name"] = results.stats
+        file["$(prefix)cg_iters/$name"] = results.iterations
+        file["$(prefix)gpu_state/$name"] = (initial = results.initial_state,
+                                            final = results.final_state,
+                                            elapsed = results.elapsed)
+    end
 end
