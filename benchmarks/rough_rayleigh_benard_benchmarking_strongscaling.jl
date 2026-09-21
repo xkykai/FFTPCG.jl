@@ -51,7 +51,7 @@ for precond_name in preconditioners
     grid = setup_grid(arch, N, grid_type)
     model = setup_model(grid, build_solver(grid, precond_name); seed = 1234 + local_rank)
 
-    results = benchmark_time_steps!(model, stable_timestep(grid), nsteps; warmup=warmup_nsteps)
+    results = benchmark_time_steps!(model, Δt, nsteps; warmup=warmup_nsteps)
     save_benchmark!(FILE_PATH, results, precond_name)
 
     grid = nothing

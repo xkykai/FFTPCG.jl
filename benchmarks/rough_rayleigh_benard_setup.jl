@@ -110,9 +110,9 @@ function setup_grid(arch, N, grid_type; Lx = 1)
     return ImmersedBoundaryGrid(grid, GridFittedBoundary(mask))
 end
 
-function stable_timestep(grid)
-    Nz = size(grid, 3)
-    return min(1 / Nz, (1 / Nz^2) / max(ν, κ)) / 3
+# Stable on the finest benchmarked grid: `stretched` with N = 256
+const Δt = let Δz = minimum(diff(stretched_z_faces(8 * 256, 1)))
+    min(Δz, Δz^2 / max(ν, κ)) / 3
 end
 
 function setup_model(grid, pressure_solver; seed = 1234)
