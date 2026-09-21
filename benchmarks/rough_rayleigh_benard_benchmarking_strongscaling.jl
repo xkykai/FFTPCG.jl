@@ -38,18 +38,24 @@ local_rank = MPI.Comm_rank(MPI.COMM_WORLD)
 
 N = grid_type == "isotropic" ? 480 : 240
 
-warmup_nsteps = 50
+warmup_nsteps = 5
 nsteps = 50
 
 OUTPUT_DIR = "./reports/strongscaling_H100$(output_suffix(grid_type))/benchmark_$(ngpus)gpu"
 mkpath(OUTPUT_DIR)
 FILE_PATH = joinpath(OUTPUT_DIR, "rank_$(local_rank).jld2")
 
+SPINUP_DIR = "./spinup/strongscaling_H100$(output_suffix(grid_type))/benchmark_$(ngpus)gpu"
+spin_up!(setup_grid(arch, N, grid_type), SPINUP_DIR; seed = 1234 + local_rank)
+GC.gc()
+CUDA.reclaim()
+
 for precond_name in preconditioners
     @info "Benchmarking $precond_name on rank $local_rank"
 
     grid = setup_grid(arch, N, grid_type)
     model = setup_model(grid, build_solver(grid, precond_name); seed = 1234 + local_rank)
+    set_spun_up_state!(model, SPINUP_DIR)
 
     results = benchmark_time_steps!(model, Δt, nsteps; warmup=warmup_nsteps)
     save_benchmark!(FILE_PATH, results, precond_name)
