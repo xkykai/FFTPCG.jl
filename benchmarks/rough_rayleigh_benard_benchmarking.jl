@@ -54,13 +54,7 @@ for N in Ns, precond_name in preconditioners
     @info "Benchmarking $precond_name for N=$N"
 
     grid = setup_grid(arch, N, grid_type)
-    spinup_dir = "./spinup/single_H100$(output_suffix(grid_type))/N$(N)"
-    spin_up!(grid, spinup_dir)
-    GC.gc()
-    CUDA.reclaim()
-
     model = setup_model(grid, build_solver(grid, precond_name))
-    set_spun_up_state!(model, spinup_dir)
 
     results = benchmark_time_steps!(model, Δt, nsteps; warmup=warmup_nsteps)
     save_benchmark!(FILE_PATH, results, precond_name; prefix="$(N)/")
