@@ -38,7 +38,7 @@ local_rank = MPI.Comm_rank(MPI.COMM_WORLD)
 
 N = grid_type == "isotropic" ? 480 : 240
 
-warmup_nsteps = 5
+warmup_nsteps = 50
 nsteps = 50
 
 OUTPUT_DIR = "./reports/weakscaling_H100$(output_suffix(grid_type))/benchmark_$(ngpus)gpu"

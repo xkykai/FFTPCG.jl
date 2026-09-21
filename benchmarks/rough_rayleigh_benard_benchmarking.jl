@@ -33,7 +33,7 @@ arch = GPU()
 sweep_Ns = grid_type == "isotropic" ? [32, 64, 96, 128, 192, 256, 384, 512] : [16, 32, 64, 96, 128, 192, 256]
 Ns = isnothing(args["N"]) ? sweep_Ns : [args["N"]]
 
-warmup_nsteps = 5
+warmup_nsteps = 50
 nsteps = 50
 
 mkpath("./reports/")
