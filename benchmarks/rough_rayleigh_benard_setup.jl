@@ -204,7 +204,8 @@ function spin_up!(grid, dir; seed = 1234)
 
     time(simulation) ≥ spinup_time || error("Spin-up stopped at t = $(time(simulation)) before reaching t = $spinup_time")
 
-    writer = JLD2Writer(model, prognostic_fields(model); dir, filename = "spun_up.jld2", schedule = IterationInterval(1))
+    writer = JLD2Writer(model, prognostic_fields(model); dir, filename = "spun_up.jld2", schedule = IterationInterval(1),
+                        array_type = Array{Float64})
     write_output!(writer, model)
 
     return nothing
