@@ -15,7 +15,7 @@ function parse_commandline()
         default = "isotropic"
         range_tester = in(GRID_TYPES)
       "--layout"
-        help = "Layout: square (n × n roughness periods) or strip (2n² × 2 periods, a quarter as tall), defaulting to both"
+        help = "Layout: square (2n × 2n roughness periods) or strip (2n² × 2 periods), defaulting to both"
         range_tester = in(("square", "strip"))
       "--bumps"
         help = "Roughness periods along each side of the square, defaulting to the whole sweep"
@@ -35,7 +35,7 @@ arch = GPU()
 
 N = 128 # 16 points per roughness period
 
-sweep_bumps = grid_type == "isotropic" ? 2 .^ (0:6) : 2 .^ (0:4)
+sweep_bumps = grid_type == "isotropic" ? 2 .^ (0:5) : 2 .^ (0:3)
 bumps = isnothing(args["bumps"]) ? sweep_bumps : [args["bumps"]]
 layouts = isnothing(args["layout"]) ? ("square", "strip") : (args["layout"],)
 
@@ -59,8 +59,8 @@ for layout in layouts, n in bumps, precond_name in preconditioners
     end
     @info "Benchmarking $precond_name for the $layout with n = $n"
 
-    Nx, Ny, Lz = layout == "square" ? (16n, 16n, 1) : (32n^2, 32, 1/4)
-    grid = setup_grid(arch, N, grid_type; Lx = Nx / N, Ly = Ny / N, Lz)
+    Nx, Ny = layout == "square" ? (32n, 32n) : (32n^2, 32)
+    grid = setup_grid(arch, N, grid_type; Lx = Nx / N, Ly = Ny / N)
     model = setup_model(grid, build_solver(grid, precond_name))
 
     results = benchmark_time_steps!(model, stable_timestep(grid), nsteps; warmup=warmup_nsteps)
