@@ -50,7 +50,7 @@ function build_solver(grid, precond_name)
         preconditioner = ColumnwiseTridiagonalPreconditioner(grid)
     end
 
-    return ConjugateGradientPoissonSolver(grid, maxiter=10000; preconditioner)
+    return ConjugateGradientPoissonSolver(grid, maxiter=20000; preconditioner)
 end
 
 function stretched_z_faces(Nz, Lz)
@@ -67,18 +67,18 @@ function stretched_z_faces(Nz, Lz)
 end
 
 """
-    setup_grid(arch, N, grid_type; Lx=1)
+    setup_grid(arch, N, grid_type; Lx=1, Ly=1)
 
-Pyramid-roughened Rayleigh-Bénard grid with `N` points per unit length in x and y, `Lx` unit
-boxes in x, and `N` (`isotropic`) or `8N` (`anisotropic`, `stretched`) points in z.
+Pyramid-roughened Rayleigh-Bénard grid of unit height with `N` points per unit length in x and y,
+lengths `Lx` and `Ly`, and `N` (`isotropic`) or `8N` (`anisotropic`, `stretched`) points in z.
 """
-function setup_grid(arch, N, grid_type; Lx = 1)
-    Ly = Lz = 1
+function setup_grid(arch, N, grid_type; Lx = 1, Ly = 1)
+    Lz = 1
     Nz = grid_type == "isotropic" ? N : 8N
     z = grid_type == "stretched" ? stretched_z_faces(Nz, Lz) : (0, Lz)
 
     grid = RectilinearGrid(arch, Float64,
-                           size = (N * Lx, N, Nz),
+                           size = (Int(N * Lx), Int(N * Ly), Nz),
                            halo = (6, 6, 6),
                            x = (0, Lx),
                            y = (0, Ly),
