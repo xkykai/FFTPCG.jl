@@ -15,7 +15,7 @@ function parse_commandline()
         default = "isotropic"
         range_tester = in(GRID_TYPES)
       "--layout"
-        help = "Horizontal layout: square (n × n roughness periods) or strip (n² × 1), defaulting to both"
+        help = "Layout: square (n × n roughness periods) or strip (2n² × 2 periods, a quarter as tall), defaulting to both"
         range_tester = in(("square", "strip"))
       "--bumps"
         help = "Roughness periods along each side of the square, defaulting to the whole sweep"
@@ -59,8 +59,8 @@ for layout in layouts, n in bumps, precond_name in preconditioners
     end
     @info "Benchmarking $precond_name for the $layout with n = $n"
 
-    Nx, Ny = layout == "square" ? (16n, 16n) : (16n^2, 16)
-    grid = setup_grid(arch, N, grid_type; Lx = Nx / N, Ly = Ny / N)
+    Nx, Ny, Lz = layout == "square" ? (16n, 16n, 1) : (32n^2, 32, 1/4)
+    grid = setup_grid(arch, N, grid_type; Lx = Nx / N, Ly = Ny / N, Lz)
     model = setup_model(grid, build_solver(grid, precond_name))
 
     results = benchmark_time_steps!(model, stable_timestep(grid), nsteps; warmup=warmup_nsteps)

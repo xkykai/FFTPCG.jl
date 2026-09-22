@@ -50,7 +50,7 @@ function build_solver(grid, precond_name)
         preconditioner = ColumnwiseTridiagonalPreconditioner(grid)
     end
 
-    return ConjugateGradientPoissonSolver(grid, maxiter=10000; preconditioner)
+    return ConjugateGradientPoissonSolver(grid, maxiter=20000; preconditioner)
 end
 
 function stretched_z_faces(Nz, Lz)
@@ -61,20 +61,19 @@ function stretched_z_faces(Nz, Lz)
     f = 0.15
     g = 0.85
 
-    spacing(z) = stretched_tanh(z, a, b, c, d, f, g)
+    spacing(z) = stretched_tanh(z / Lz, a, b, c, d, f, g)
 
     return stretched_grid_from_spacing(spacing, 0, Lz, Nz + 1)
 end
 
 """
-    setup_grid(arch, N, grid_type; Lx=1, Ly=1)
+    setup_grid(arch, N, grid_type; Lx=1, Ly=1, Lz=1)
 
-Pyramid-roughened Rayleigh-Bénard grid of unit height with `N` points per unit length in x and y,
-lengths `Lx` and `Ly`, and `N` (`isotropic`) or `8N` (`anisotropic`, `stretched`) points in z.
+Pyramid-roughened Rayleigh-Bénard grid with lengths `Lx`, `Ly`, and `Lz`, `N` points per unit length
+in x and y, and `N` (`isotropic`) or `8N` (`anisotropic`, `stretched`) points per unit length in z.
 """
-function setup_grid(arch, N, grid_type; Lx = 1, Ly = 1)
-    Lz = 1
-    Nz = grid_type == "isotropic" ? N : 8N
+function setup_grid(arch, N, grid_type; Lx = 1, Ly = 1, Lz = 1)
+    Nz = Int((grid_type == "isotropic" ? N : 8N) * Lz)
     z = grid_type == "stretched" ? stretched_z_faces(Nz, Lz) : (0, Lz)
 
     grid = RectilinearGrid(arch, Float64,
@@ -117,9 +116,10 @@ end
 
 function setup_model(grid, pressure_solver; seed = 1234)
     closure = ScalarDiffusivity(ν=ν, κ=κ)
+    Lz = grid.underlying_grid.Lz
 
     @inline function rayleigh_benard_buoyancy(x, y, z, t)
-        above_centerline = z > 1 / 2
+        above_centerline = z > Lz / 2
         return ifelse(above_centerline, -1/2, 1/2)
     end
 
@@ -139,7 +139,7 @@ function setup_model(grid, pressure_solver; seed = 1234)
                                 boundary_conditions = (u=u_bcs, v=v_bcs, w=w_bcs, b=b_bcs))
 
     Random.seed!(seed)
-    bᵢ(x, y, z) = rand() * 1e-2 - z + 0.5
+    bᵢ(x, y, z) = rand() * 1e-2 - z / Lz + 0.5
     set!(model, b=bᵢ)
 
     return model
