@@ -14,8 +14,11 @@ function parse_commandline()
         help = "Grid type: one of $(join(GRID_TYPES, ", "))"
         default = "isotropic"
         range_tester = in(GRID_TYPES)
-      "--Lx"
-        help = "Domain length in x to benchmark, defaulting to the whole sweep"
+      "--layout"
+        help = "Horizontal layout: square (n × n roughness periods) or strip (n² × 1), defaulting to both"
+        range_tester = in(("square", "strip"))
+      "--bumps"
+        help = "Roughness periods along each side of the square, defaulting to the whole sweep"
         arg_type = Int
       "--preconditioners"
         help = "Comma-separated list drawn from $(join(PRECONDITIONERS, ", "))"
@@ -30,10 +33,11 @@ preconditioners = split(args["preconditioners"], ',')
 
 arch = GPU()
 
-N = grid_type == "isotropic" ? 32 : 16
+N = 128 # 16 points per roughness period
 
-sweep_Lxs = 2 .^ (0:12)
-Lxs = isnothing(args["Lx"]) ? sweep_Lxs : [args["Lx"]]
+sweep_bumps = grid_type == "isotropic" ? 2 .^ (0:6) : 2 .^ (0:4)
+bumps = isnothing(args["bumps"]) ? sweep_bumps : [args["bumps"]]
+layouts = isnothing(args["layout"]) ? ("square", "strip") : (args["layout"],)
 
 warmup_nsteps = 50
 nsteps = 50
@@ -48,18 +52,19 @@ function key_exists(file_path, key)
     end
 end
 
-for Lx in Lxs, precond_name in preconditioners
-    if key_exists(FILE_PATH, "Lx$(Lx)/times/$(precond_name)")
-        @info "Skipping $precond_name for Lx=$Lx (already benchmarked)"
+for layout in layouts, n in bumps, precond_name in preconditioners
+    if key_exists(FILE_PATH, "$layout/$n/times/$(precond_name)")
+        @info "Skipping $precond_name for the $layout with n = $n (already benchmarked)"
         continue
     end
-    @info "Benchmarking $precond_name for Lx=$Lx"
+    @info "Benchmarking $precond_name for the $layout with n = $n"
 
-    grid = setup_grid(arch, N, grid_type; Lx)
+    Nx, Ny = layout == "square" ? (16n, 16n) : (16n^2, 16)
+    grid = setup_grid(arch, N, grid_type; Lx = Nx / N, Ly = Ny / N)
     model = setup_model(grid, build_solver(grid, precond_name))
 
     results = benchmark_time_steps!(model, stable_timestep(grid), nsteps; warmup=warmup_nsteps)
-    save_benchmark!(FILE_PATH, results, precond_name; prefix="Lx$(Lx)/")
+    save_benchmark!(FILE_PATH, results, precond_name; prefix="$layout/$n/")
 
     grid = nothing
     model = nothing
