@@ -19,4 +19,5 @@ Oceananigans = "9e8cae18-63c1-5223-a75c-80ca9d6e9a09"
 Roots = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
 
 [extras]
+CUDA_Compiler_jll = "d1e2174e-dfdc-576e-b43e-73b79eb1aca8"
 CUDA_Runtime_jll = "76a88914-d11a-5bdc-97e0-2f5a05c973a2"
