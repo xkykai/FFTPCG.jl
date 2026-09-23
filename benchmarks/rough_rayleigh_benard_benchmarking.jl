@@ -43,7 +43,7 @@ warmup_nsteps = 50
 nsteps = 50
 
 mkpath("./reports/")
-FILE_PATH = joinpath("./reports/", "single_H100$(output_suffix(grid_type)).jld2")
+FILE_PATH = joinpath("./reports/", "single_$(gpu_model())$(output_suffix(grid_type)).jld2")
 
 function key_exists(file_path, key)
     isfile(file_path) || return false

@@ -36,12 +36,12 @@ preconditioners = split(args["preconditioners"], ',')
 arch = benchmark_architecture()
 local_rank = MPI.Comm_rank(MPI.COMM_WORLD)
 
-N = grid_type == "isotropic" ? 480 : 240
+N = points_per_unit_length(grid_type)
 
 warmup_nsteps = 50
 nsteps = 50
 
-OUTPUT_DIR = "./reports/strongscaling_H100$(output_suffix(grid_type))/benchmark_$(ngpus)gpu"
+OUTPUT_DIR = "./reports/strongscaling_$(gpu_model())$(output_suffix(grid_type))/benchmark_$(ngpus)gpu"
 mkpath(OUTPUT_DIR)
 FILE_PATH = joinpath(OUTPUT_DIR, "rank_$(local_rank).jld2")
 

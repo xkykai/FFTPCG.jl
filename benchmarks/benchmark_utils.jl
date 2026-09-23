@@ -17,6 +17,19 @@ gpu_state() = let dev = CUDA.NVML.Device(CUDA.uuid(CUDA.device()))
      power = CUDA.NVML.power_usage(dev))
 end
 
+gpu_model() = match(r"[A-Z]\d{2,3}", CUDA.name(CUDA.device())).match
+
+"""
+    points_per_unit_length(grid_type)
+
+Points per unit length that fill most of one GPU: 480 (`isotropic`) or 240 on GPUs with 80 GB of
+memory, and 320 or 160 on smaller ones.
+"""
+function points_per_unit_length(grid_type)
+    N = CUDA.totalmem(CUDA.device()) > 60e9 ? 480 : 320
+    return grid_type == "isotropic" ? N : N ÷ 2
+end
+
 function benchmark_architecture()
     MPI.Comm_size(MPI.COMM_WORLD) == 1 && return GPU()
     return Distributed(GPU(); partition = Partition(x = Equal()), synchronized_communication = false)
