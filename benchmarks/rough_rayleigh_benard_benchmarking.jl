@@ -33,7 +33,7 @@ preconditioners = split(args["preconditioners"], ',')
 
 arch = GPU()
 
-largest_side, _, Nz = gpu_block_size(grid_type)
+Nx_max, _, Nz = gpu_block_size(grid_type)
 
 if grid_type == "isotropic"
     square_sides = (16, 32, 64, 128, 256, 512, 640)
@@ -43,7 +43,7 @@ else
     strip_lengths, strip_width = (64, 256, 1024, 4096), 16
 end
 
-sizes = (square = [(Nx, Nx, Nz) for Nx in square_sides if Nx ≤ largest_side],
+sizes = (square = [(Nx, Nx, Nz) for Nx in square_sides if Nx ≤ Nx_max],
          strip = [(Nx, strip_width, Nz) for Nx in strip_lengths])
 layouts = isnothing(args["layout"]) ? ("square", "strip") : (args["layout"],)
 
