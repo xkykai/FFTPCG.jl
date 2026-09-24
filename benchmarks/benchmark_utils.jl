@@ -22,11 +22,11 @@ gpu_model() = match(r"[A-Z]\d{2,3}", CUDA.name(CUDA.device())).match
 """
     points_per_unit_length(grid_type)
 
-Points per unit length that fill most of one GPU: 480 (`isotropic`) or 240 on GPUs with 80 GB of
-memory, and 320 or 160 on smaller ones.
+Points per unit length that nearly fill one GPU with a unit cube: 640 (`isotropic`) or 320 on GPUs
+with 80 GB of memory, and 512 or 256 on smaller ones.
 """
 function points_per_unit_length(grid_type)
-    N = CUDA.totalmem(CUDA.device()) > 60e9 ? 480 : 320
+    N = CUDA.totalmem(CUDA.device()) > 60e9 ? 640 : 512
     return grid_type == "isotropic" ? N : N ÷ 2
 end
 

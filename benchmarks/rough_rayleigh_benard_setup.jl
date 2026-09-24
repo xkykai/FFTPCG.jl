@@ -70,7 +70,8 @@ end
     setup_grid(arch, N, grid_type; Lx=1, Ly=1)
 
 Pyramid-roughened Rayleigh-Bénard grid of unit height with `N` points per unit length in x and y,
-lengths `Lx` and `Ly`, and `N` (`isotropic`) or `8N` (`anisotropic`, `stretched`) points in z.
+lengths `Lx` and `Ly`, `N` (`isotropic`) or `8N` (`anisotropic`, `stretched`) points in z, and one
+roughness element per 16 points in x and y.
 """
 function setup_grid(arch, N, grid_type; Lx = 1, Ly = 1)
     Lz = 1
@@ -85,7 +86,7 @@ function setup_grid(arch, N, grid_type; Lx = 1, Ly = 1)
                            z = z,
                            topology = (Bounded, Bounded, Bounded))
 
-    Nr = 8 # roughness elements per unit length
+    Nr = N ÷ 16 # roughness elements per unit length
     h = 1 / (2Nr)
     x₀s = h:2h:Lx-h
     y₀s = h:2h:Ly-h
