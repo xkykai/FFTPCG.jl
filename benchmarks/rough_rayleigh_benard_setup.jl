@@ -69,15 +69,14 @@ end
 """
     setup_grid(arch, grid_type, Nx, Ny, Nz)
 
-Pyramid-roughened Rayleigh-Bénard grid of unit height with `Nx × Ny × Nz` points. `isotropic` grids
-have spacing `1/Nz` in every direction; `anisotropic` and `stretched` grids have twice the horizontal
-spacing of the `isotropic` grid with `Nz/4` points. Every pyramid is 16 `isotropic` grid spacings
-wide and half as tall, so larger grids hold more pyramids. `stretched` grids cluster points in z near
-the top and bottom.
+Pyramid-roughened Rayleigh-Bénard grid of unit height with `Nx × Ny × Nz` points. The horizontal
+spacing is `1/Nz` for `isotropic` grids and `4/Nz` for `anisotropic` and `stretched` grids. Every
+pyramid is 16 horizontal points wide and half as tall, so larger grids hold more pyramids.
+`stretched` grids cluster points in z near the top and bottom.
 """
 function setup_grid(arch, grid_type, Nx, Ny, Nz)
-    N = grid_type == "isotropic" ? Nz : Nz ÷ 4 # isotropic points per unit length
-    Δx = grid_type == "isotropic" ? 1 / N : 2 / N
+    N = grid_type == "isotropic" ? Nz : Nz ÷ 4 # horizontal points per unit length
+    Δx = 1 / N
     Lx = Nx * Δx
     Ly = Ny * Δx
     Lz = 1
