@@ -6,7 +6,7 @@ using Random
 
 include("../utils/construct_stretched_spacing.jl")
 
-const Ra = 1e6
+const Ra = 1e8
 const ν = κ = 1 / sqrt(Ra)
 
 const GRID_TYPES = ("isotropic", "anisotropic", "stretched")
