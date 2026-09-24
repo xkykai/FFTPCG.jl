@@ -17,6 +17,20 @@ gpu_state() = let dev = CUDA.NVML.Device(CUDA.uuid(CUDA.device()))
      power = CUDA.NVML.power_usage(dev))
 end
 
+gpu_model() = match(r"[A-Z]\d{2,3}", CUDA.name(CUDA.device())).match
+
+"""
+    gpu_block_size(grid_type)
+
+Points `(Nx, Ny, Nz)` that nearly fill one GPU: `N × N × N` for `isotropic` grids and
+`N/2 × N/2 × 4N` for `anisotropic` and `stretched` grids, with `N = 640` on GPUs with 80 GB of
+memory and `N = 512` otherwise.
+"""
+function gpu_block_size(grid_type)
+    N = CUDA.totalmem(CUDA.device()) > 60e9 ? 640 : 512
+    return grid_type == "isotropic" ? (N, N, N) : (N ÷ 2, N ÷ 2, 4N)
+end
+
 function benchmark_architecture()
     MPI.Comm_size(MPI.COMM_WORLD) == 1 && return GPU()
     return Distributed(GPU(); partition = Partition(x = Equal()), synchronized_communication = false)
