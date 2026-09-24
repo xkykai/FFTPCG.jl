@@ -67,27 +67,29 @@ function stretched_z_faces(Nz, Lz)
 end
 
 """
-    setup_grid(arch, N, grid_type; Lx=1, Ly=1)
+    setup_grid(arch, grid_type, Nx, Ny, Nz)
 
-Pyramid-roughened Rayleigh-Bénard grid of unit height with `N` points per unit length in x and y,
-lengths `Lx` and `Ly`, `N` (`isotropic`) or `8N` (`anisotropic`, `stretched`) points in z, and one
-roughness element per 16 points in x and y.
+Pyramid-roughened Rayleigh-Bénard grid of unit height with `Nx × Ny × Nz` points. The horizontal
+spacing is 1/512 (`isotropic`) or 1/256 (`anisotropic`, `stretched`), and every pyramid is 1/32
+wide and 1/64 tall, so larger grids hold more pyramids. `stretched` grids cluster points in z near
+the top and bottom.
 """
-function setup_grid(arch, N, grid_type; Lx = 1, Ly = 1)
+function setup_grid(arch, grid_type, Nx, Ny, Nz)
+    Δx = grid_type == "isotropic" ? 1/512 : 1/256
+    Lx = Nx * Δx
+    Ly = Ny * Δx
     Lz = 1
-    Nz = grid_type == "isotropic" ? N : 8N
     z = grid_type == "stretched" ? stretched_z_faces(Nz, Lz) : (0, Lz)
 
     grid = RectilinearGrid(arch, Float64,
-                           size = (Int(N * Lx), Int(N * Ly), Nz),
+                           size = (Nx, Ny, Nz),
                            halo = (6, 6, 6),
                            x = (0, Lx),
                            y = (0, Ly),
                            z = z,
                            topology = (Bounded, Bounded, Bounded))
 
-    Nr = N ÷ 16 # roughness elements per unit length
-    h = 1 / (2Nr)
+    h = 1/64 # pyramid height and half-width
     x₀s = h:2h:Lx-h
     y₀s = h:2h:Ly-h
 

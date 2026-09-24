@@ -20,14 +20,15 @@ end
 gpu_model() = match(r"[A-Z]\d{2,3}", CUDA.name(CUDA.device())).match
 
 """
-    points_per_unit_length(grid_type)
+    gpu_block_size(grid_type)
 
-Points per unit length that nearly fill one GPU with a unit cube: 640 (`isotropic`) or 320 on GPUs
-with 80 GB of memory, and 512 or 256 on smaller ones.
+Points `(Nx, Ny, Nz)` that nearly fill one GPU: `N × N × N` for `isotropic` grids and
+`N/2 × N/2 × 4N` for `anisotropic` and `stretched` grids, with `N = 640` on GPUs with 80 GB of
+memory and `N = 512` otherwise.
 """
-function points_per_unit_length(grid_type)
+function gpu_block_size(grid_type)
     N = CUDA.totalmem(CUDA.device()) > 60e9 ? 640 : 512
-    return grid_type == "isotropic" ? N : N ÷ 2
+    return grid_type == "isotropic" ? (N, N, N) : (N ÷ 2, N ÷ 2, 4N)
 end
 
 function benchmark_architecture()

@@ -15,7 +15,7 @@ function parse_commandline()
         default = "isotropic"
         range_tester = in(GRID_TYPES)
       "--layout"
-        help = "Layout: square (Nx × Nx points) or strip (Nx × 32 points), defaulting to both"
+        help = "Layout: square (Nx × Nx points) or strip (Nx × 32 points, Nx × 16 for anisotropic and stretched grids), defaulting to both"
         range_tester = in(("square", "strip"))
       "--nx"
         help = "Points in x, defaulting to the whole sweep"
@@ -33,10 +33,18 @@ preconditioners = split(args["preconditioners"], ',')
 
 arch = GPU()
 
-N = points_per_unit_length(grid_type)
+largest_side, _, Nz = gpu_block_size(grid_type)
 
-sweep = (square = filter(≤(N), (16, 32, 64, 128, 256, 512, 640)),
-         strip = filter(Nx -> 32Nx ≤ N^2, (128, 512, 2048, 8192)))
+if grid_type == "isotropic"
+    square_sides = (16, 32, 64, 128, 256, 512, 640)
+    strip_lengths, strip_width = (128, 512, 2048, 8192), 32
+else
+    square_sides = (16, 32, 64, 128, 256, 320)
+    strip_lengths, strip_width = (64, 256, 1024, 4096), 16
+end
+
+sizes = (square = [(Nx, Nx, Nz) for Nx in square_sides if Nx ≤ largest_side],
+         strip = [(Nx, strip_width, Nz) for Nx in strip_lengths])
 layouts = isnothing(args["layout"]) ? ("square", "strip") : (args["layout"],)
 
 warmup_nsteps = 50
@@ -52,15 +60,16 @@ function key_exists(file_path, key)
     end
 end
 
-for layout in layouts, Nx in something(args["nx"], sweep[Symbol(layout)]), precond_name in preconditioners
+for layout in layouts, (Nx, Ny, Nz) in sizes[Symbol(layout)], precond_name in preconditioners
+    isnothing(args["nx"]) || Nx == args["nx"] || continue
+
     if key_exists(FILE_PATH, "$layout/$Nx/times/$(precond_name)")
         @info "Skipping $precond_name for the $layout with Nx = $Nx (already benchmarked)"
         continue
     end
     @info "Benchmarking $precond_name for the $layout with Nx = $Nx"
 
-    Ny = layout == "square" ? Nx : 32
-    grid = setup_grid(arch, N, grid_type; Lx = Nx / N, Ly = Ny / N)
+    grid = setup_grid(arch, grid_type, Nx, Ny, Nz)
     model = setup_model(grid, build_solver(grid, precond_name))
 
     results = benchmark_time_steps!(model, stable_timestep(grid), nsteps; warmup=warmup_nsteps)
