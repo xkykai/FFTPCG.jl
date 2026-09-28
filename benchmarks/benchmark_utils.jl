@@ -77,6 +77,13 @@ function benchmark_time_steps!(model, Δt, nsteps; warmup = nsteps)
     return (; stats, iterations, elapsed, initial_state, final_state = gpu_state())
 end
 
+function key_exists(file_path, key)
+    isfile(file_path) || return false
+    return jldopen(file_path, "r") do file
+        haskey(file, key)
+    end
+end
+
 """
     save_benchmark!(file_path, results, name; prefix="")
 

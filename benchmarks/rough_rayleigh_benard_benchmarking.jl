@@ -53,13 +53,6 @@ nsteps = 50
 mkpath("./reports/")
 FILE_PATH = joinpath("./reports/", "single_$(gpu_model())$(output_suffix(grid_type)).jld2")
 
-function key_exists(file_path, key)
-    isfile(file_path) || return false
-    return jldopen(file_path, "r") do file
-        haskey(file, key)
-    end
-end
-
 for layout in layouts, (Nx, Ny, Nz) in sizes[Symbol(layout)], precond_name in preconditioners
     isnothing(args["nx"]) || Nx == args["nx"] || continue
 
