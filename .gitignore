@@ -78,6 +78,7 @@ statprof
 # Additional file types
 *.sh
 *.slurm
+*.pbs
 *.pptx
 *.txt
 *.csv
