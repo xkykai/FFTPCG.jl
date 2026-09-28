@@ -46,6 +46,10 @@ mkpath(OUTPUT_DIR)
 FILE_PATH = joinpath(OUTPUT_DIR, "rank_$(local_rank).jld2")
 
 for precond_name in preconditioners
+    if MPI.Allreduce(Int(key_exists(FILE_PATH, "times/$precond_name")), min, MPI.COMM_WORLD) == 1
+        @info "Skipping $precond_name on rank $local_rank (already benchmarked)"
+        continue
+    end
     @info "Benchmarking $precond_name on rank $local_rank"
 
     grid = setup_grid(arch, grid_type, Nx, Ny, Nz)
