@@ -14,8 +14,11 @@ function parse_commandline()
         help = "Grid type: one of $(join(GRID_TYPES, ", "))"
         default = "isotropic"
         range_tester = in(GRID_TYPES)
-      "--N"
-        help = "Resolution to benchmark, defaulting to the whole sweep for the chosen grid"
+      "--layout"
+        help = "Layout: square (Nx × Nx points) or strip (Nx × 32 points, Nx × 16 for anisotropic and stretched grids), defaulting to both"
+        range_tester = in(("square", "strip"))
+      "--nx"
+        help = "Points in x, defaulting to the whole sweep"
         arg_type = Int
       "--preconditioners"
         help = "Comma-separated list drawn from $(join(PRECONDITIONERS, ", "))"
@@ -30,14 +33,25 @@ preconditioners = split(args["preconditioners"], ',')
 
 arch = GPU()
 
-sweep_Ns = grid_type == "isotropic" ? [32, 64, 96, 128, 192, 256, 384, 512] : [16, 32, 64, 96, 128, 192, 256]
-Ns = isnothing(args["N"]) ? sweep_Ns : [args["N"]]
+Nx_max, _, Nz = gpu_block_size(grid_type)
+
+if grid_type == "isotropic"
+    square_sides = (16, 32, 64, 128, 256, 512, 640)
+    strip_lengths, strip_width = (128, 512, 2048, 8192), 32
+else
+    square_sides = (16, 32, 64, 128, 256, 320)
+    strip_lengths, strip_width = (64, 256, 1024, 4096), 16
+end
+
+sizes = (square = [(Nx, Nx, Nz) for Nx in square_sides if Nx ≤ Nx_max],
+         strip = [(Nx, strip_width, Nz) for Nx in strip_lengths])
+layouts = isnothing(args["layout"]) ? ("square", "strip") : (args["layout"],)
 
 warmup_nsteps = 50
 nsteps = 50
 
 mkpath("./reports/")
-FILE_PATH = joinpath("./reports/", "single_H100$(output_suffix(grid_type)).jld2")
+FILE_PATH = joinpath("./reports/", "single_$(gpu_model())$(output_suffix(grid_type)).jld2")
 
 function key_exists(file_path, key)
     isfile(file_path) || return false
@@ -46,18 +60,20 @@ function key_exists(file_path, key)
     end
 end
 
-for N in Ns, precond_name in preconditioners
-    if key_exists(FILE_PATH, "$(N)/times/$(precond_name)")
-        @info "Skipping $precond_name for N=$N (already benchmarked)"
+for layout in layouts, (Nx, Ny, Nz) in sizes[Symbol(layout)], precond_name in preconditioners
+    isnothing(args["nx"]) || Nx == args["nx"] || continue
+
+    if key_exists(FILE_PATH, "$layout/$Nx/times/$(precond_name)")
+        @info "Skipping $precond_name for the $layout with Nx = $Nx (already benchmarked)"
         continue
     end
-    @info "Benchmarking $precond_name for N=$N"
+    @info "Benchmarking $precond_name for the $layout with Nx = $Nx"
 
-    grid = setup_grid(arch, N, grid_type)
+    grid = setup_grid(arch, grid_type, Nx, Ny, Nz)
     model = setup_model(grid, build_solver(grid, precond_name))
 
     results = benchmark_time_steps!(model, stable_timestep(grid), nsteps; warmup=warmup_nsteps)
-    save_benchmark!(FILE_PATH, results, precond_name; prefix="$(N)/")
+    save_benchmark!(FILE_PATH, results, precond_name; prefix="$layout/$Nx/")
 
     grid = nothing
     model = nothing

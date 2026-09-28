@@ -6,7 +6,7 @@ using Random
 
 include("../utils/construct_stretched_spacing.jl")
 
-const Ra = 1e6
+const Ra = 1e8
 const ν = κ = 1 / sqrt(Ra)
 
 const GRID_TYPES = ("isotropic", "anisotropic", "stretched")
@@ -50,7 +50,7 @@ function build_solver(grid, precond_name)
         preconditioner = ColumnwiseTridiagonalPreconditioner(grid)
     end
 
-    return ConjugateGradientPoissonSolver(grid, maxiter=10000; preconditioner)
+    return ConjugateGradientPoissonSolver(grid, maxiter=20000; preconditioner)
 end
 
 function stretched_z_faces(Nz, Lz)
@@ -67,26 +67,30 @@ function stretched_z_faces(Nz, Lz)
 end
 
 """
-    setup_grid(arch, N, grid_type; Lx=1)
+    setup_grid(arch, grid_type, Nx, Ny, Nz)
 
-Pyramid-roughened Rayleigh-Bénard grid with `N` points per unit length in x and y, `Lx` unit
-boxes in x, and `N` (`isotropic`) or `8N` (`anisotropic`, `stretched`) points in z.
+Pyramid-roughened Rayleigh-Bénard grid of unit height with `Nx × Ny × Nz` points. The horizontal
+spacing is `1/Nz` for `isotropic` grids and `4/Nz` for `anisotropic` and `stretched` grids. Every
+pyramid is 16 horizontal points wide and half as tall, so larger grids hold more pyramids.
+`stretched` grids cluster points in z near the top and bottom.
 """
-function setup_grid(arch, N, grid_type; Lx = 1)
-    Ly = Lz = 1
-    Nz = grid_type == "isotropic" ? N : 8N
+function setup_grid(arch, grid_type, Nx, Ny, Nz)
+    N = grid_type == "isotropic" ? Nz : Nz ÷ 4 # horizontal points per unit length
+    Δx = 1 / N
+    Lx = Nx * Δx
+    Ly = Ny * Δx
+    Lz = 1
     z = grid_type == "stretched" ? stretched_z_faces(Nz, Lz) : (0, Lz)
 
     grid = RectilinearGrid(arch, Float64,
-                           size = (N * Lx, N, Nz),
+                           size = (Nx, Ny, Nz),
                            halo = (6, 6, 6),
                            x = (0, Lx),
                            y = (0, Ly),
                            z = z,
                            topology = (Bounded, Bounded, Bounded))
 
-    Nr = 8 # roughness elements per unit length
-    h = 1 / (2Nr)
+    h = 8 / N # pyramid height and half-width
     x₀s = h:2h:Lx-h
     y₀s = h:2h:Ly-h
 
@@ -111,8 +115,8 @@ function setup_grid(arch, N, grid_type; Lx = 1)
 end
 
 function stable_timestep(grid)
-    Nz = size(grid, 3)
-    return min(1 / Nz, (1 / Nz^2) / max(ν, κ)) / 3
+    Δz = minimum_zspacing(grid)
+    return min(Δz, Δz^2 / max(ν, κ)) / 3
 end
 
 function setup_model(grid, pressure_solver; seed = 1234)
