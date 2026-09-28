@@ -37,10 +37,10 @@ Nx_max, _, Nz = gpu_block_size(grid_type)
 
 if grid_type == "isotropic"
     square_sides = (16, 32, 64, 128, 256, 512, 640)
-    strip_lengths, strip_width = (128, 512, 2048, 8192), 32
+    strip_lengths, strip_width = (128, 512, 2048, 8192, 12800), 32
 else
     square_sides = (16, 32, 64, 128, 256, 320)
-    strip_lengths, strip_width = (64, 256, 1024, 4096), 16
+    strip_lengths, strip_width = (64, 256, 1024, 4096, 6400), 16
 end
 
 sizes = (square = [(Nx, Nx, Nz) for Nx in square_sides if Nx ≤ Nx_max],
