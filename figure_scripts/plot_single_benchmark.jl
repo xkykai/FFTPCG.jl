@@ -1,56 +1,31 @@
-using JLD2
-using Statistics
 using CairoMakie
 using Makie
 
-filepath = "./reports/single_H100.jld2"
+include("single_benchmark_medians.jl")
 
-Ns = [32, 64, 96, 128, 192, 256, 384, 512]
-
-file = jldopen(filepath, "r")
-
-precond_names = ["no", "FFT64", "FFT32", "MITgcm"]
-
-median_times = Dict{String, Vector{Float64}}()
-median_cg_iters = Dict{String, Vector{Float64}}()
-
-for name in precond_names
-    median_times[name] = zeros(length(Ns))
-    median_cg_iters[name] = zeros(length(Ns))
-    for (i, N) in enumerate(Ns)
-        nsamples = length(file["$(N)/times/$(name)"])
-        times = file["$(N)/times/$(name)"]
-        median_times[name][i] = median([t.time for t in times])
-        cg_iters = file["$(N)/cg_iters/$(name)"]
-        median_cg_iters[name][i] = median(cg_iters)
-    end
-end
-
-median_times["FFT_only"] = zeros(length(Ns))
-for (i, N) in enumerate(Ns)
-    nsamples = length(file["$(N)/times/FFTstep"])
-    times = file["$(N)/times/FFTstep"]
-    median_times["FFT_only"][i] = median([t.time for t in times])
-end
+data = single_benchmark_medians("./reports/single_H100.jld2", "square"; strip_width=32, Nz=640)
 
 #%%
 colors = Makie.wong_colors();
-linewidth = 3
-fig = Figure(size=(1000, 500), fontsize=15)
-axtime = Axis(fig[1, 1], xlabel="N (Problem size is N³)", ylabel="Median Time per Timestep (s)", yscale = log10, xscale=log2)
-axiters = Axis(fig[1, 2], xlabel="N (Problem size is N³)", ylabel="Median CG Iterations per Timestep", yscale = log10, xscale=log2)
-lines!(axtime, Ns, median_times["no"], label="No Preconditioner", linewidth=linewidth, color=colors[1])
-lines!(axtime, Ns, median_times["FFT64"], label="FFT64 Preconditioner", linewidth=linewidth, color=colors[2])
-lines!(axtime, Ns, median_times["FFT32"], label="FFT32 Preconditioner", linewidth=linewidth, color=colors[3])
-lines!(axtime, Ns, median_times["MITgcm"], label="Diagonally-dominant Preconditioner (MITgcm)", linewidth=linewidth, color=colors[4])
-lines!(axtime, Ns, median_times["FFT_only"], label="FFT Only", linewidth=linewidth, color=colors[5])
+linewidth = 5
+markersize = 15
+xlabel = "Grid points (Nx × Nx × 640)"
+fig = Figure(size=(1300, 550), fontsize=23)
+axtime = Axis(fig[1, 1]; xlabel, ylabel="Wall time per timestep (s)", yscale=log10, xscale=log10)
+axiters = Axis(fig[1, 2]; xlabel, ylabel="CG iters per timestep", yscale=log10, xscale=log10)
+axratio = Axis(fig[1, 3]; xlabel, ylabel="Method time /\nFFT-only solve time", yscale=log10, xscale=log10)
 
-lines!(axiters, Ns, median_cg_iters["no"], label="No Preconditioner", linewidth=linewidth, color=colors[1])
-lines!(axiters, Ns, median_cg_iters["FFT64"], label="FFT64 Preconditioner", linewidth=linewidth, color=colors[2])
-lines!(axiters, Ns, median_cg_iters["FFT32"], label="FFT32 Preconditioner", linewidth=linewidth, color=colors[3])
-lines!(axiters, Ns, median_cg_iters["MITgcm"], label="Diagonally-dominant Preconditioner (MITgcm)", linewidth=linewidth, color=colors[4])
+for (i, (name, label)) in enumerate(PRECONDITIONER_LABELS)
+    color = colors[i]
+    linestyle = name == "FFT" ? :dot : :solid
+    scatterlines!(axtime, data.N, data.time[name]; label, linewidth, color, markersize, linestyle)
+    name == "FFT" && continue
+    scatterlines!(axiters, data.N, data.iterations[name]; linewidth, color, markersize)
+    scatterlines!(axratio, data.N, data.time[name] ./ data.time["FFT"]; linewidth, color, markersize)
+end
 
-Legend(fig[2, :], axtime, orientation=:horizontal, nbanks=2)
+Legend(fig[2, :], axtime, nbanks=3, orientation=:horizontal, patchsize=(40, 20))
+Label(fig[0, :], "Single GPU Benchmark (NVIDIA H100)", font=:bold)
 
 display(fig)
 save("./Output/benchmark_single_H100.png", fig, px_per_unit=4)
