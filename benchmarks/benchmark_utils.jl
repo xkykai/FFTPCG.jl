@@ -1,6 +1,7 @@
 using CUDA
 using MPI
 using JLD2
+using FileWatching.Pidfile: mkpidlock
 using Oceananigans
 using Oceananigans.DistributedComputations: Distributed, Partition, Equal
 using Oceananigans.Solvers: ConjugateGradientPoissonSolver
@@ -78,9 +79,11 @@ function benchmark_time_steps!(model, Δt, nsteps; warmup = nsteps)
 end
 
 function key_exists(file_path, key)
-    isfile(file_path) || return false
-    return jldopen(file_path, "r") do file
-        haskey(file, key)
+    mkpidlock(file_path * ".lock"; stale_age = 60) do
+        isfile(file_path) || return false
+        return jldopen(file_path, "r") do file
+            haskey(file, key)
+        end
     end
 end
 
@@ -89,18 +92,21 @@ end
 
 Write the timing `results` for preconditioner `name` into `file_path`, replacing any existing
 entry, under the keys `prefix * "times/" * name` and its `cg_iters` and `gpu_state` siblings.
+Concurrent jobs take turns through the lock file `file_path * ".lock"`.
 """
 function save_benchmark!(file_path, results, name; prefix = "")
-    jldopen(file_path, "a") do file
-        for group in ("times", "cg_iters", "gpu_state")
-            key = "$prefix$group/$name"
-            haskey(file, key) && delete!(file, key)
-        end
+    mkpidlock(file_path * ".lock"; stale_age = 60) do
+        jldopen(file_path, "a") do file
+            for group in ("times", "cg_iters", "gpu_state")
+                key = "$prefix$group/$name"
+                haskey(file, key) && delete!(file, key)
+            end
 
-        file["$(prefix)times/$name"] = results.stats
-        file["$(prefix)cg_iters/$name"] = results.iterations
-        file["$(prefix)gpu_state/$name"] = (initial = results.initial_state,
-                                            final = results.final_state,
-                                            elapsed = results.elapsed)
+            file["$(prefix)times/$name"] = results.stats
+            file["$(prefix)cg_iters/$name"] = results.iterations
+            file["$(prefix)gpu_state/$name"] = (initial = results.initial_state,
+                                                final = results.final_state,
+                                                elapsed = results.elapsed)
+        end
     end
 end
