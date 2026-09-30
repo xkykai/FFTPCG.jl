@@ -24,6 +24,14 @@ function parse_commandline()
       "--preconditioners"
         help = "Comma-separated list drawn from $(join(PRECONDITIONERS, ", "))"
         default = join(PRECONDITIONERS, ',')
+      "--warmup-steps"
+        help = "Time steps taken before timing starts"
+        arg_type = Int
+        default = 50
+      "--steps"
+        help = "Time steps timed"
+        arg_type = Int
+        default = 50
     end
     return parse_args(s)
 end
@@ -38,8 +46,8 @@ local_rank = MPI.Comm_rank(MPI.COMM_WORLD)
 
 Nx, Ny, Nz = gpu_block_size(grid_type)
 
-warmup_nsteps = 50
-nsteps = 50
+warmup_nsteps = args["warmup-steps"]
+nsteps = args["steps"]
 
 mkpath("./reports/")
 FILE_PATH = joinpath("./reports/", "weakscaling_$(gpu_model())$(output_suffix(grid_type)).jld2")
