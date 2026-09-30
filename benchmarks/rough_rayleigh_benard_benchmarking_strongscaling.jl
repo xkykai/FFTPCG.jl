@@ -41,12 +41,12 @@ Nx, Ny, Nz = gpu_block_size(grid_type)
 warmup_nsteps = 50
 nsteps = 50
 
-OUTPUT_DIR = "./reports/strongscaling_$(gpu_model())$(output_suffix(grid_type))/benchmark_$(ngpus)gpu"
-mkpath(OUTPUT_DIR)
-FILE_PATH = joinpath(OUTPUT_DIR, "rank_$(local_rank).jld2")
+mkpath("./reports/")
+FILE_PATH = joinpath("./reports/", "strongscaling_$(gpu_model())$(output_suffix(grid_type)).jld2")
+prefix = "$(ngpus)gpu/rank_$(local_rank)/"
 
 for precond_name in preconditioners
-    if MPI.Allreduce(Int(key_exists(FILE_PATH, "times/$precond_name")), min, MPI.COMM_WORLD) == 1
+    if MPI.Allreduce(Int(key_exists(FILE_PATH, "$(prefix)times/$precond_name")), min, MPI.COMM_WORLD) == 1
         @info "Skipping $precond_name on rank $local_rank (already benchmarked)"
         continue
     end
@@ -56,7 +56,7 @@ for precond_name in preconditioners
     model = setup_model(grid, build_solver(grid, precond_name); seed = 1234 + local_rank)
 
     results = benchmark_time_steps!(model, stable_timestep(grid), nsteps; warmup=warmup_nsteps)
-    save_benchmark!(FILE_PATH, results, precond_name)
+    save_benchmark!(FILE_PATH, results, precond_name; prefix)
 
     grid = nothing
     model = nothing
