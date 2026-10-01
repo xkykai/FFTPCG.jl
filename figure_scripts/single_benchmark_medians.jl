@@ -14,7 +14,7 @@ const PRECONDITIONER_LABELS = ["no" => "No preconditioner",
 Total grid points `N` and the median wall time [s] and CG iterations per time step of every
 preconditioner benchmarked on the `layout` (`"square"` or `"strip"`) domains of the `grid`
 (`"isotropic"`, `"anisotropic"` or `"stretched"`), ordered by `N`, with the strip width `Ny`
-and vertical points `Nz` of that grid.
+and vertical points `Nz` of that grid. Preconditioners missing at a size are `NaN`.
 """
 function single_benchmark_medians(grid, layout)
     file_path = grid == "isotropic" ? "./reports/single_H100.jld2" : "./reports/single_H100_$grid.jld2"
@@ -25,11 +25,10 @@ function single_benchmark_medians(grid, layout)
         Ny = layout == "square" ? Nxs : strip_width
         N = Nxs .* Ny .* Nz
 
-        time = Dict(name => [median(t.time for t in file["$layout/$Nx/times/$name"]) for Nx in Nxs]
-                    for (name, _) in PRECONDITIONER_LABELS)
-        iterations = Dict(name => [median(file["$layout/$Nx/cg_iters/$name"]) for Nx in Nxs]
-                          for (name, _) in PRECONDITIONER_LABELS)
+        medians(group, f) = Dict(name => [haskey(file, "$layout/$Nx/$group/$name") ?
+                                          median(f, file["$layout/$Nx/$group/$name"]) : NaN for Nx in Nxs]
+                                 for (name, _) in PRECONDITIONER_LABELS)
 
-        return (; N, time, iterations, strip_width, Nz)
+        return (; N, time=medians("times", t -> t.time), iterations=medians("cg_iters", identity), strip_width, Nz)
     end
 end
