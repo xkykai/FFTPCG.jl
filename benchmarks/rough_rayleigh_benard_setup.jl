@@ -50,7 +50,7 @@ function build_solver(grid, precond_name)
         preconditioner = ColumnwiseTridiagonalPreconditioner(grid)
     end
 
-    return ConjugateGradientPoissonSolver(grid, maxiter=20000; preconditioner)
+    return ConjugateGradientPoissonSolver(grid; preconditioner)
 end
 
 function stretched_z_faces(Nz, Lz)
