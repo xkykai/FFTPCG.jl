@@ -64,23 +64,23 @@ MPI.Barrier(comm)
 report("model built: preconditioner $precond_name, at most $(args["maxiter"]) CG iterations per solve")
 
 function timed_step!(model, Δt, comm)
-    t = @elapsed begin
+    stats = @timed begin
         time_step!(model, Δt)
         CUDA.synchronize()
         MPI.Barrier(comm)
     end
-    return t, solver_iterations(model.pressure_solver)
+    return @sprintf("%.2f s (%.2f s in %d garbage collections), %d CG iterations in the last solve",
+                    stats.time, stats.gctime, stats.gcstats.pause, solver_iterations(model.pressure_solver))
 end
 
 for n in 1:args["warmup-steps"]
-    t, iterations = timed_step!(model, Δt, comm)
-    report(@sprintf("warmup step %d: %.2f s, %d CG iterations in the last solve", n, t, iterations))
+    report("warmup step $n: " * timed_step!(model, Δt, comm))
 end
 
 CUDA.@profile external=true begin
     for n in 1:args["steps"]
-        t, iterations = NVTX.@range "time step $n" timed_step!(model, Δt, comm)
-        report(@sprintf("profiled step %d: %.2f s, %d CG iterations in the last solve", n, t, iterations))
+        summary = NVTX.@range "time step $n" timed_step!(model, Δt, comm)
+        report("profiled step $n: " * summary)
     end
 end
 report("done")
