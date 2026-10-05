@@ -45,7 +45,7 @@ solver `iterations` per step, and the `elapsed` time of the whole loop measured 
 barriers.
 
 The GPU is synchronized inside the timed block, so `stats[n].time` is the time to complete
-the step rather than the time to queue it.
+the step rather than the time to queue it. Every step ends with a minor garbage collection.
 """
 function benchmark_time_steps!(model, Δt, nsteps; warmup = nsteps)
     comm = communicator(model.architecture)
@@ -53,6 +53,7 @@ function benchmark_time_steps!(model, Δt, nsteps; warmup = nsteps)
 
     for _ in 1:warmup
         time_step!(model, Δt)
+        GC.gc(false)
     end
 
     stats = []
@@ -66,6 +67,7 @@ function benchmark_time_steps!(model, Δt, nsteps; warmup = nsteps)
     for _ in 1:nsteps
         t = @timed begin
             time_step!(model, Δt)
+            GC.gc(false)
             CUDA.synchronize()
         end
         push!(stats, t)
