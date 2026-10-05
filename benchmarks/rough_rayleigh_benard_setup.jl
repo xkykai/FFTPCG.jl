@@ -14,26 +14,6 @@ const PRECONDITIONERS = ("FFT", "no", "FFT64", "FFT32", "DiagonallyDominant", "C
 
 output_suffix(grid_type) = grid_type == "isotropic" ? "" : "_$grid_type"
 
-@inline function local_roughness_bottom(η, η₀, h)
-    if η > η₀ - h && η <= η₀
-        return η + h - η₀
-    elseif η > η₀ && η <= η₀ + h
-        return -η + h + η₀
-    else
-        return 0
-    end
-end
-
-@inline function local_roughness_top(η, η₀, h)
-    if η > η₀ - h && η <= η₀
-        return -η - h + η₀
-    elseif η > η₀ && η <= η₀ + h
-        return η - h - η₀
-    else
-        return 0
-    end
-end
-
 function build_solver(grid, precond_name)
     precond_name == "FFT" && return nothing
 
@@ -50,7 +30,7 @@ function build_solver(grid, precond_name)
         preconditioner = ColumnwiseTridiagonalPreconditioner(grid)
     end
 
-    return ConjugateGradientPoissonSolver(grid, maxiter=20000; preconditioner)
+    return ConjugateGradientPoissonSolver(grid; preconditioner)
 end
 
 function stretched_z_faces(Nz, Lz)
@@ -91,25 +71,12 @@ function setup_grid(arch, grid_type, Nx, Ny, Nz)
                            topology = (Bounded, Bounded, Bounded))
 
     h = 8 / N # pyramid height and half-width
-    x₀s = h:2h:Lx-h
-    y₀s = h:2h:Ly-h
+    ϵ = 1e-9 * h # cell centres on a pyramid face are solid despite rounding
 
-    # Woven pattern: ridges in x and y directions create pyramids
-    @inline function roughness_bottom(x, y, z)
-        z_rough_x = sum([local_roughness_bottom(x, x₀, h) for x₀ in x₀s])
-        z_rough_y = sum([local_roughness_bottom(y, y₀, h) for y₀ in y₀s])
-        z_rough = min(z_rough_x, z_rough_y)
-        return z <= z_rough
-    end
-
-    @inline function roughness_top(x, y, z)
-        z_rough_x = sum([local_roughness_top(x, x₀, h) for x₀ in x₀s])
-        z_rough_y = sum([local_roughness_top(y, y₀, h) for y₀ in y₀s])
-        z_rough = max(z_rough_x, z_rough_y)
-        return z >= z_rough + Lz
-    end
-
-    @inline mask(x, y, z) = roughness_bottom(x, y, z) | roughness_top(x, y, z)
+    # Pyramids where triangle waves of period 2h in x and y cross
+    @inline triangle(η) = h - abs(mod(η, 2h) - h)
+    @inline pyramid(x, y) = min(triangle(x), triangle(y)) + ϵ
+    @inline mask(x, y, z) = (z <= pyramid(x, y)) | (z >= Lz - pyramid(x, y))
 
     return ImmersedBoundaryGrid(grid, GridFittedBoundary(mask))
 end
