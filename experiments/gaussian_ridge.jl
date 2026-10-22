@@ -1,15 +1,10 @@
 using Printf
-using Dates
 using Oceananigans
 using Oceananigans.Operators
 using Oceananigans.Units
-using Oceananigans.Solvers
 using Oceananigans.Models.NonhydrostaticModels: ConjugateGradientPoissonSolver, FFTBasedPoissonSolver
 using Oceananigans.Models: buoyancy_field
 using Oceananigans.Grids: with_number_type
-using Oceananigans.Utils: launch!
-using Oceananigans.Architectures: architecture
-using KernelAbstractions: @kernel, @index
 using Random
 using CairoMakie
 using CUDA
@@ -26,9 +21,7 @@ function setup_grid(Nx, Nz, Lx, Lz)
             topology = (Periodic, Flat, Bounded),
             halo = (4, 4)
         )
-    
-        dx = Lx / Nx
-    
+
         basin(x) = -Lz + 10 * exp(-x^2 / (2 * 16^2))
     
         ImmersedBoundaryGrid(
@@ -81,6 +74,7 @@ function setup_model(grid, pressure_solver)
 end
 
 function initial_conditions!(model)
+    Random.seed!(1234)
     initial_T(x, z) = 20 + rand() * 1e-5
     initial_S(x, z) = 35
     initial_c(x, z) = 1
@@ -88,22 +82,8 @@ function initial_conditions!(model)
     set!(model, T = initial_T, S = initial_S, c = initial_c)
 end
 
-@kernel function _divergence!(target_field, u, v, w, grid)
-    i, j, k = @index(Global, NTuple)
-    @inbounds target_field[i, j, k] = divᶜᶜᶜ(i, j, k, grid, u, v, w)
-end
-
-function compute_flow_divergence!(target_field, model)
-    grid = model.grid
-    u, v, w = model.velocities
-    arch = architecture(grid)
-    launch!(arch, grid, :xyz, _divergence!, target_field, u, v, w, grid)
-    return nothing
-end
-
 function setup_simulation(model)
     Δt = 0.01
-    # stop_time = 1days
     stop_time = 6hours
     simulation = Simulation(model; Δt = Δt, stop_time = stop_time)
     
@@ -113,8 +93,8 @@ function setup_simulation(model)
 
     wall_time = Ref(time_ns())
 
-    d = CenterField(model.grid)
-    compute_flow_divergence!(d, model)
+    u, v, w = model.velocities
+    d = Field(KernelFunctionOperation{Center, Center, Center}(divᶜᶜᶜ, model.grid, u, v, w))
 
     function progress(sim)
         pressure_solver = sim.model.pressure_solver
@@ -130,7 +110,7 @@ function setup_simulation(model)
     
         elapsed = 1e-9 * (time_ns() - wall_time[])
     
-        compute_flow_divergence!(d, sim.model)
+        compute!(d)
     
         msg *= @sprintf(", max u: %6.3e, max w: %6.3e, max T: %6.3e, max S: %6.3e, max d: %6.3e, max pressure: %6.3e, wall time: %s",
                         maximum(abs, sim.model.velocities.u),
@@ -148,8 +128,6 @@ function setup_simulation(model)
     end
 
     simulation.callbacks[:progress] = Callback(progress, IterationInterval(100))
-    
-    u, v, w = model.velocities
 
     T, S, c = model.tracers.T, model.tracers.S, model.tracers.c
     p = model.pressures.pNHS + model.pressures.pHY′
@@ -323,15 +301,15 @@ Colorbar(fig[2, 1], hmT_FFT, label = "°C", vertical=false, flipaxis=false)
 Colorbar(fig[2, 2], hmS_FFT, label = "psu", vertical=false, flipaxis=false)
 Colorbar(fig[2, 3], hmc_FFT, label = "c", vertical=false, flipaxis=false)
 Colorbar(fig[2, 4], hmd_FFT, label = "s⁻¹", vertical=false, flipaxis=false)
-Colorbar(fig[2, 5], hmp_FFT, label = "Pa", vertical=false, flipaxis=false)
-Colorbar(fig[2, 6], hmb_FFT, label = "m²/s²", vertical=false, flipaxis=false)
+Colorbar(fig[2, 5], hmp_FFT, label = "m²/s²", vertical=false, flipaxis=false)
+Colorbar(fig[2, 6], hmb_FFT, label = "m/s²", vertical=false, flipaxis=false)
 
 Colorbar(fig[4, 1], hmT_cg, label = "°C", vertical=false, flipaxis=false)
 Colorbar(fig[4, 2], hmS_cg, label = "psu", vertical=false, flipaxis=false)
 Colorbar(fig[4, 3], hmc_cg, label = "c", vertical=false, flipaxis=false)
 Colorbar(fig[4, 4], hmd_cg, label = "s⁻¹", vertical=false, flipaxis=false)
-Colorbar(fig[4, 5], hmp_cg, label = "Pa", vertical=false, flipaxis=false)
-Colorbar(fig[4, 6], hmb_cg, label = "m²/s²", vertical=false, flipaxis=false)
+Colorbar(fig[4, 5], hmp_cg, label = "m²/s²", vertical=false, flipaxis=false)
+Colorbar(fig[4, 6], hmb_cg, label = "m/s²", vertical=false, flipaxis=false)
 
 lines!(axTbar, times ./ 1days, Tbar_cg, label="PCG")
 lines!(axSbar, times ./ 1days, Sbar_cg, label="PCG")
@@ -353,7 +331,6 @@ axislegend(axTbar)
 
 display(fig)
 
-# save("./cg_fft_gaussian_ridge_mwe_fields_constantS.pdf", fig)
 CairoMakie.record(fig, "./Output/cg_fft_gaussian_ridge_mwe_fields_constantS_noslip_Centered.mp4", 1:Nt, framerate=10, px_per_unit=2) do nn
     n[] = nn
 end
@@ -362,8 +339,8 @@ residual = Array(interior(model.pressure_solver.conjugate_gradient_solver.residu
 rlim = (-maximum(abs, residual), maximum(abs, residual)) ./ 2
 fig = Figure(size=(1000, 700))
 ax = Axis(fig[1, 1], xlabel = "x (m)", ylabel = "z (m)", title = "Pressure CG solver residual")
-hm = heatmap!(ax, xC, zC, Array(interior(model.pressure_solver.conjugate_gradient_solver.residual))[:, 1, :], colorrange = rlim, colormap=:balance)
-Colorbar(fig[1, 2], hm, label = "Pa")
+hm = heatmap!(ax, xC, zC, residual[:, 1, :], colorrange = rlim, colormap=:balance)
+Colorbar(fig[1, 2], hm, label = "m²/s²")
 display(fig)
 save("./cg_fft_mwe_fields_residual.png", fig, px_per_unit = 4)
 #%%
