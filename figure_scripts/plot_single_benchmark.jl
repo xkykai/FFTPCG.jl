@@ -3,13 +3,15 @@ using Makie
 
 include("single_benchmark_medians.jl")
 
-data = single_benchmark_medians("./reports/single_H100.jld2", "square"; strip_width=32, Nz=640)
+# Usage: julia --project figure_scripts/plot_single_benchmark.jl [isotropic|anisotropic|stretched]
+grid = get(ARGS, 1, "isotropic")
+data = single_benchmark_medians(grid, "square")
 
 #%%
 colors = Makie.wong_colors();
 linewidth = 5
 markersize = 15
-xlabel = "Grid points (Nx × Nx × 640)"
+xlabel = "Grid points (Nx × Nx × $(data.Nz))"
 fig = Figure(size=(1300, 550), fontsize=23)
 axtime = Axis(fig[1, 1]; xlabel, ylabel="Wall time per timestep (s)", yscale=log10, xscale=log10)
 axiters = Axis(fig[1, 2]; xlabel, ylabel="CG iters per timestep", yscale=log10, xscale=log10)
@@ -25,8 +27,8 @@ for (i, (name, label)) in enumerate(PRECONDITIONER_LABELS)
 end
 
 Legend(fig[2, :], axtime, nbanks=3, orientation=:horizontal, patchsize=(40, 20))
-Label(fig[0, :], "Single GPU Benchmark (NVIDIA H100)", font=:bold)
+Label(fig[0, :], "Single GPU Benchmark (NVIDIA H100), $grid grid", font=:bold)
 
 display(fig)
-save("./Output/benchmark_single_H100.png", fig, px_per_unit=4)
+save("./Output/benchmark_single_H100_$grid.png", fig, px_per_unit=4)
 #%%

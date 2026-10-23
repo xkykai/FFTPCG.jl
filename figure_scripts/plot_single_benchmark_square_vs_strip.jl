@@ -3,12 +3,13 @@ using Makie
 
 include("single_benchmark_medians.jl")
 
-file_path = "./reports/single_H100.jld2"
-strip_width, Nz = 32, 640
+# Usage: julia --project figure_scripts/plot_single_benchmark_square_vs_strip.jl [isotropic|anisotropic|stretched]
+grid = get(ARGS, 1, "isotropic")
+data = [single_benchmark_medians(grid, layout) for layout in ("square", "strip")]
+(; strip_width, Nz) = first(data)
 
-layouts = ["square" => "Square (Nx × Nx × $Nz)", "strip" => "Strip (Nx × $strip_width × $Nz)"]
+layout_labels = ["Square (Nx × Nx × $Nz)", "Strip (Nx × $strip_width × $Nz)"]
 linestyles = [:solid, :dash]
-data = [single_benchmark_medians(file_path, layout; strip_width, Nz) for (layout, _) in layouts]
 
 #%%
 colors = Makie.wong_colors();
@@ -31,10 +32,10 @@ end
 preconditioner_entries = [LineElement(; color=colors[i], linewidth) for i in eachindex(PRECONDITIONER_LABELS)]
 layout_entries = [LineElement(; color=:black, linestyle, linewidth) for linestyle in linestyles]
 Legend(fig[2, :], [preconditioner_entries, layout_entries],
-       [last.(PRECONDITIONER_LABELS), last.(layouts)], ["Solver", "Domain"],
+       [last.(PRECONDITIONER_LABELS), layout_labels], ["Solver", "Domain"],
        nbanks=3, orientation=:horizontal, patchsize=(40, 20))
-Label(fig[0, :], "Single GPU Benchmark (NVIDIA H100): square vs strip domains", font=:bold)
+Label(fig[0, :], "Single GPU Benchmark (NVIDIA H100), $grid grid: square vs strip domains", font=:bold)
 
 display(fig)
-save("./Output/benchmark_single_H100_square_vs_strip.png", fig, px_per_unit=4)
+save("./Output/benchmark_single_H100_$(grid)_square_vs_strip.png", fig, px_per_unit=4)
 #%%
