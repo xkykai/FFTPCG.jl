@@ -31,7 +31,7 @@ function parse_commandline()
       "--steps"
         help = "Time steps timed"
         arg_type = Int
-        default = 30
+        default = 50
     end
     return parse_args(s)
 end
