@@ -2,6 +2,7 @@ using Oceananigans
 using Oceananigans.Models.NonhydrostaticModels: ConjugateGradientPoissonSolver, nonhydrostatic_pressure_solver
 using Oceananigans.Solvers: DiagonallyDominantPreconditioner, ColumnwiseTridiagonalPreconditioner
 using Oceananigans.Grids: with_number_type
+using Oceananigans.DistributedComputations: partition
 using Random
 
 include("../utils/construct_stretched_spacing.jl")
@@ -86,7 +87,7 @@ function stable_timestep(grid)
     return min(Δz, Δz^2 / max(ν, κ)) / 3
 end
 
-function setup_model(grid, pressure_solver; seed = 1234)
+function setup_model(grid, pressure_solver; seed = 1234, global_size = nothing)
     closure = ScalarDiffusivity(ν=ν, κ=κ)
 
     @inline function rayleigh_benard_buoyancy(x, y, z, t)
@@ -110,8 +111,15 @@ function setup_model(grid, pressure_solver; seed = 1234)
                                 boundary_conditions = (u=u_bcs, v=v_bcs, w=w_bcs, b=b_bcs))
 
     Random.seed!(seed)
-    bᵢ(x, y, z) = rand() * 1e-2 - z + 0.5
-    set!(model, b=bᵢ)
+    if isnothing(global_size)
+        bᵢ(x, y, z) = rand() * 1e-2 - z + 0.5
+        set!(model, b=bᵢ)
+    else
+        # Noise drawn for the whole `global_size` grid, so every partition of it starts from the same field
+        z = reshape(Array(znodes(grid, Center())), 1, 1, :)
+        b = rand(global_size...) .* 1e-2 .- z .+ 0.5
+        set!(model, b = partition(b, model.tracers.b))
+    end
 
     return model
 end

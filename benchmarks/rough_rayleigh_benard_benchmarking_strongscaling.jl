@@ -61,7 +61,7 @@ for precond_name in preconditioners
     @info "Benchmarking $precond_name on rank $local_rank"
 
     grid = setup_grid(arch, grid_type, Nx, Ny, Nz)
-    model = setup_model(grid, build_solver(grid, precond_name); seed = 1234 + local_rank)
+    model = setup_model(grid, build_solver(grid, precond_name); global_size = (Nx, Ny, Nz))
 
     results = benchmark_time_steps!(model, stable_timestep(grid), nsteps; warmup=warmup_nsteps)
     save_benchmark!(FILE_PATH, results, precond_name; prefix)
