@@ -117,7 +117,7 @@ function setup_model(grid, pressure_solver; seed = 1234, global_size = nothing)
     else
         # Noise drawn for the whole `global_size` grid, so every partition of it starts from the same field
         z = reshape(Array(znodes(grid, Center())), 1, 1, :)
-        b = rand(global_size...) * 1e-2 .- z .+ 0.5
+        b = rand(global_size...) .* 1e-2 .- z .+ 0.5
         set!(model, b = partition(b, model.tracers.b))
     end
 
