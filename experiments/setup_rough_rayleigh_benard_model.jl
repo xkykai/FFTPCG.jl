@@ -22,54 +22,13 @@ end
 #####
 ##### Grid setup
 #####
-#
-# Build the immersed-boundary grid for the rough Rayleigh–Bénard /
-# sea-ice-formation simulation. Same topography, resolution, and domain size as
-# `rough_rayleigh_benard_seaiceformation_noslip_halfdomain.jl`, but always
-# periodic in x (topology = (Periodic, Flat, Bounded)).
-#
-#     grid = setup_grid(; Nr=16)
-
-function setup_grid(; Nr, arch = GPU(), N = 512)
-    Lx = 1
-    Lz = 1
-    Nx = N
-    Nz = N
-
-    # Periodic-in-x grid
-    grid = RectilinearGrid(arch, Float64,
-                           size = (Nx, Nz),
-                           halo = (6, 6),
-                           x = (0, Lx),
-                           z = (0, Lz),
-                           topology = (Periodic, Flat, Bounded))
-
-    # Roughness elements along the top boundary
-    hx = Lx / Nr / 2
-    h_element = Lx / 2
-
-    @inline function roughness_top(x, z)
-        z_rough_x = zero(x)
-        for n in 1:Nr
-            x₀ = (2n - 1) * hx
-            z_rough_x += local_roughness_top(x, x₀, hx, h_element)
-        end
-        return z >= z_rough_x + Lz
-    end
-
-    @inline mask(x, z) = roughness_top(x, z)
-
-    return ImmersedBoundaryGrid(grid, GridFittedBoundary(mask))
-end
 
 function setup_stretched_grid(; Nr, arch = GPU(), Nx = 512, Nz = 256)
     Lx = 1
     Lz = 1
 
-    # Grid-spacing profile: fine spacing near the boundaries (where the thermal
-    # boundary layers and roughness live) and coarser spacing in the interior.
-    # Only the ratio d/c matters, since stretched_grid_from_spacing normalizes
-    # the cumulative density.
+    # Spacing is d/c = 4 times coarser for f < z < g than in the bottom
+    # boundary layer and the roughness region
     a = 15
     b = 15
     c = 1 / (2Nz)
@@ -113,23 +72,8 @@ end
 ##### Model setup
 #####
 #
-# Build the model on a previously constructed `grid` (see `setup_grid`). Same
-# boundary conditions, closure, buoyancy, tracers, and initial conditions as the
-# original script.
-#
-# `pressure_solver` is a builder `grid -> solver` so the solver can be
-# constructed from the grid, e.g.
-#
-#     grid  = setup_grid(; Nr=16)
-#     model = setup_model(grid, grid -> FFTBasedPoissonSolver(grid.underlying_grid); Ra=1e8)
-#
-#     model = setup_model(grid; Ra=1e8) do grid
-#         reduced_precision_grid = with_number_type(Float32, grid.underlying_grid)
-#         preconditioner = FFTBasedPoissonSolver(reduced_precision_grid)
-#         ConjugateGradientPoissonSolver(grid, maxiter=80; preconditioner)
-#     end
-#
-# An already-constructed solver object may also be passed directly.
+# `pressure_solver` is a solver, a function `grid -> solver`, or `nothing`
+# for the Oceananigans default.
 
 function setup_model(grid, pressure_solver; Ra)
     # Physical parameters
