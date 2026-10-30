@@ -4,7 +4,7 @@ using Makie
 include("single_benchmark_medians.jl")
 
 file_path = "./reports/single_H100.jld2"
-strip_width, Nz = 32, 640
+strip_width, Nz = 32, 600
 
 layouts = ["square" => "Square (Nx × Nx × $Nz)", "strip" => "Strip (Nx × $strip_width × $Nz)"]
 linestyles = [:solid, :dash]
