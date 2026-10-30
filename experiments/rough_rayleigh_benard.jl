@@ -24,31 +24,7 @@ function parse_commandline()
       "--solver"
         help = "Type of pressure solver to use (FFT or CG)"
         arg_type = String
-        default = "FFT"
-      "--N"
-        help = "Grid size in each direction (Nx = Nz = N)"
-        arg_type = Int
-        default = 512
-      "--Ra"
-        help = "Rayleigh number"
-        arg_type = Float64
-        default = 1e8
-      "--Nr"
-        help = "Number of roughness elements"
-        arg_type = Int
-        default = 16
-      "--grid"
-        help = "Grid type to use (uniform or stretched)"
-        arg_type = String
-        default = "uniform"
-      "--Nx"
-        help = "Number of grid points in x (stretched grid only)"
-        arg_type = Int
-        default = 512
-      "--Nz"
-        help = "Number of grid points in z (stretched grid only)"
-        arg_type = Int
-        default = 256
+        default = "CG"
     end
     return parse_args(s)
 end
@@ -57,13 +33,11 @@ include("setup_rough_rayleigh_benard_model.jl")
 
 args = parse_commandline()
 solver_type = args["solver"]
-N = args["N"]
-grid_type = args["grid"]
 
 arch = GPU()
 
-const Ra = args["Ra"]
-const Nr = args["Nr"]
+const Ra = 1e8
+const Nr = 8
 const g = 1
 const α = 1
 const β = 4
@@ -77,24 +51,10 @@ const ν = sqrt(Δb * g * H^3 * Pr / Ra)
 const κ = ν / Pr
 const Lx = 1
 const Lz = 1
+const Nx = 1024
+const Nz = 512
 
-const topology_type = "periodic"
-
-#####
-##### Grid and model setup (see setup_rough_rayleigh_benard_model.jl)
-#####
-
-if grid_type == "stretched"
-    grid = setup_stretched_grid(; Nr, arch, Nx = args["Nx"], Nz = args["Nz"])
-elseif grid_type == "uniform"
-    grid = setup_grid(; Nr, arch, N)
-else
-    error("Unknown grid type: $(grid_type). Choose 'uniform' or 'stretched'.")
-end
-
-# Actual grid size (uniform: Nx = Nz = N; stretched: as requested)
-const Nx = grid.Nx
-const Nz = grid.Nz
+grid = setup_stretched_grid(; Nr, arch, Nx, Nz)
 
 if solver_type == "FFT"
     pressure_solver = nothing
@@ -107,7 +67,7 @@ end
 
 model = setup_model(grid, pressure_solver; Ra)
 
-filename = "rough_RB_seaiceformation_Ra_$(Ra)_Pr_$(Pr)_Nr_$(Nr)_Lx_$(Lx)_Lz_$(Lz)_Nx_$(Nx)_Nz_$(Nz)_$(grid_type)_$(pressure_solver_str)"
+filename = "rough_RB_seaiceformation_noslip_periodic_halfdomain_stretched_Ra_$(Ra)_Pr_$(Pr)_Nr_$(Nr)_Lx_$(Lx)_Lz_$(Lz)_Nx_$(Nx)_Nz_$(Nz)_$(pressure_solver_str)"
 
 FILE_DIR = "./Data/$(filename)"
 mkpath(FILE_DIR)
