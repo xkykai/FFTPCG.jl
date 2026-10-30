@@ -75,7 +75,7 @@ end
 
 function initial_conditions!(model)
     Random.seed!(1234)
-    initial_T(x, z) = 20 + rand() * 1e-5
+    initial_T(x, z) = 20 + 1e-5 * randn()
     initial_S(x, z) = 35
     initial_c(x, z) = 1
 
