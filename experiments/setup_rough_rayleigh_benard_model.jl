@@ -27,10 +27,8 @@ function setup_stretched_grid(; Nr, arch = GPU(), Nx = 512, Nz = 256)
     Lx = 1
     Lz = 1
 
-    # Grid-spacing profile: fine spacing near the boundaries (where the thermal
-    # boundary layers and roughness live) and coarser spacing in the interior.
-    # Only the ratio d/c matters, since stretched_grid_from_spacing normalizes
-    # the cumulative density.
+    # Spacing is d/c = 4 times coarser for f < z < g than in the bottom
+    # boundary layer and the roughness region
     a = 15
     b = 15
     c = 1 / (2Nz)
@@ -74,23 +72,8 @@ end
 ##### Model setup
 #####
 #
-# Build the model on a previously constructed `grid` (see `setup_stretched_grid`). Same
-# boundary conditions, closure, buoyancy, tracers, and initial conditions as the
-# original script.
-#
-# `pressure_solver` is a builder `grid -> solver` so the solver can be
-# constructed from the grid, e.g.
-#
-#     grid  = setup_stretched_grid(; Nr=8)
-#     model = setup_model(grid, grid -> FFTBasedPoissonSolver(grid.underlying_grid); Ra=1e8)
-#
-#     model = setup_model(grid; Ra=1e8) do grid
-#         reduced_precision_grid = with_number_type(Float32, grid.underlying_grid)
-#         preconditioner = FFTBasedPoissonSolver(reduced_precision_grid)
-#         ConjugateGradientPoissonSolver(grid, maxiter=80; preconditioner)
-#     end
-#
-# An already-constructed solver object may also be passed directly.
+# `pressure_solver` is a solver, a function `grid -> solver`, or `nothing`
+# for the Oceananigans default.
 
 function setup_model(grid, pressure_solver; Ra)
     # Physical parameters
