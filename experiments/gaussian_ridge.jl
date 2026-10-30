@@ -155,13 +155,13 @@ function setup_simulation(model)
     simulation.output_writers[:jld2] = JLD2Writer(model, outputs,
                                                         schedule = TimeInterval(10minutes),
                                                         filename = "$(OUTPUT_PATH)_fields",
-                                                        overwrite_existing = true,
+                                                        overwrite_files = true,
                                                         with_halos = true)
 
     simulation.output_writers[:jld2_averaged] = JLD2Writer(model, averaged_outputs,
                                                                 schedule = TimeInterval(10minutes),
                                                                 filename = "$(OUTPUT_PATH)_averaged",
-                                                                overwrite_existing = true,
+                                                                overwrite_files = true,
                                                                 with_halos = true)
 
     return simulation
