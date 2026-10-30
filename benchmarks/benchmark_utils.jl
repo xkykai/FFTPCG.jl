@@ -23,12 +23,12 @@ gpu_model() = match(r"[A-Z]\d{2,3}", CUDA.name(CUDA.device())).match
 """
     gpu_block_size(grid_type)
 
-Points `(Nx, Ny, Nz)` that nearly fill one GPU: `N × N × N` for `isotropic` grids and
-`N/2 × N/2 × 4N` for `anisotropic` and `stretched` grids, with `N = 640` on GPUs with 80 GB of
-memory and `N = 512` otherwise.
+Points `(Nx, Ny, Nz)` that nearly fill one GPU with any preconditioner: `N × N × N` for
+`isotropic` grids and `N/2 × N/2 × 4N` for `anisotropic` and `stretched` grids, with `N = 640` on
+GPUs with 80 GB of memory and `N = 480` otherwise.
 """
 function gpu_block_size(grid_type)
-    N = CUDA.totalmem(CUDA.device()) > 60e9 ? 640 : 512
+    N = CUDA.totalmem(CUDA.device()) > 60e9 ? 640 : 480
     return grid_type == "isotropic" ? (N, N, N) : (N ÷ 2, N ÷ 2, 4N)
 end
 
