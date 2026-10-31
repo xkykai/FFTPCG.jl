@@ -3,13 +3,13 @@ using Makie
 
 include("single_benchmark_medians.jl")
 
-data = single_benchmark_medians("./reports/single_H100_anisotropic.jld2", "square"; strip_width=16, Nz=2400)
+data = single_benchmark_medians("./reports/single_H100_anisotropic.jld2", "square")
 
 #%%
 colors = Makie.wong_colors();
 linewidth = 5
 markersize = 15
-xlabel = "Grid points (Nx × Nx × 2400)"
+xlabel = "Grid points (Nx × Nx × $(data.sizes[1][3]))"
 fig = Figure(size=(1300, 550), fontsize=23)
 axtime = Axis(fig[1, 1]; xlabel, ylabel="Wall time per timestep (s)", yscale=log10, xscale=log10)
 axiters = Axis(fig[1, 2]; xlabel, ylabel="CG iters per timestep", yscale=log10, xscale=log10)

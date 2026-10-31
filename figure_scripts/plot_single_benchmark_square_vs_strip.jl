@@ -4,11 +4,11 @@ using Makie
 include("single_benchmark_medians.jl")
 
 file_path = "./reports/single_H100.jld2"
-strip_width, Nz = 32, 600
+data = [single_benchmark_medians(file_path, layout) for layout in ("square", "strip")]
+_, strip_width, Nz = data[2].sizes[1]
 
 layouts = ["square" => "Square (Nx × Nx × $Nz)", "strip" => "Strip (Nx × $strip_width × $Nz)"]
 linestyles = [:solid, :dash]
-data = [single_benchmark_medians(file_path, layout; strip_width, Nz) for (layout, _) in layouts]
 
 #%%
 colors = Makie.wong_colors();
