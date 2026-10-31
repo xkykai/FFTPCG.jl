@@ -23,12 +23,12 @@ gpu_model() = match(r"[A-Z]\d{2,3}", CUDA.name(CUDA.device())).match
 """
     gpu_block_size(grid_type)
 
-Points `(Nx, Ny, Nz)` that nearly fill one GPU with any preconditioner: `N × N × N` for
-`isotropic` grids and `N/2 × N/2 × 4N` for `anisotropic` and `stretched` grids, with `N = 640` on
+Points `(Nx, Ny, Nz)` that fit on one GPU with any preconditioner: `N × N × N` for
+`isotropic` grids and `N/2 × N/2 × 4N` for `anisotropic` and `stretched` grids, with `N = 600` on
 GPUs with 80 GB of memory and `N = 448` otherwise.
 """
 function gpu_block_size(grid_type)
-    N = CUDA.totalmem(CUDA.device()) > 60e9 ? 640 : 448
+    N = CUDA.totalmem(CUDA.device()) > 60e9 ? 600 : 448
     return grid_type == "isotropic" ? (N, N, N) : (N ÷ 2, N ÷ 2, 4N)
 end
 
@@ -77,7 +77,7 @@ function benchmark_time_steps!(model, Δt, nsteps; warmup = nsteps)
     barrier()
     elapsed = (time_ns() - t₀) * 1e-9
 
-    return (; stats, iterations, elapsed, initial_state, final_state = gpu_state())
+    return (; stats, iterations, elapsed, initial_state, final_state = gpu_state(), size = size(model.grid))
 end
 
 function key_exists(file_path, key)
@@ -93,13 +93,13 @@ end
     save_benchmark!(file_path, results, name; prefix="")
 
 Write the timing `results` for preconditioner `name` into `file_path`, replacing any existing
-entry, under the keys `prefix * "times/" * name` and its `cg_iters` and `gpu_state` siblings.
+entry, under the keys `prefix * "times/" * name` and its `cg_iters`, `gpu_state` and `size` siblings.
 Concurrent jobs take turns through the lock file `file_path * ".lock"`.
 """
 function save_benchmark!(file_path, results, name; prefix = "")
     mkpidlock(file_path * ".lock"; stale_age = 60) do
         jldopen(file_path, "a") do file
-            for group in ("times", "cg_iters", "gpu_state")
+            for group in ("times", "cg_iters", "gpu_state", "size")
                 key = "$prefix$group/$name"
                 haskey(file, key) && delete!(file, key)
             end
@@ -109,6 +109,7 @@ function save_benchmark!(file_path, results, name; prefix = "")
             file["$(prefix)gpu_state/$name"] = (initial = results.initial_state,
                                                 final = results.final_state,
                                                 elapsed = results.elapsed)
+            file["$(prefix)size/$name"] = results.size
         end
     end
 end
