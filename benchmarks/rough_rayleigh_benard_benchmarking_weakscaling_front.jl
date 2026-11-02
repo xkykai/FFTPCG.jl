@@ -1,0 +1,79 @@
+using MPI
+using Oceananigans
+using JLD2
+using CUDA
+using ArgParse
+using Random
+
+include("benchmark_utils.jl")
+include("rough_rayleigh_benard_setup.jl")
+
+MPI.Init()
+
+function parse_commandline()
+    s = ArgParseSettings()
+
+    @add_arg_table! s begin
+      "--ngpus"
+        help = "Number of GPUs to use"
+        arg_type = Int
+        default = 1
+      "--grid"
+        help = "Grid type: one of $(join(GRID_TYPES, ", "))"
+        default = "isotropic"
+        range_tester = in(GRID_TYPES)
+      "--preconditioners"
+        help = "Comma-separated list drawn from $(join(PRECONDITIONERS, ", "))"
+        default = join(PRECONDITIONERS, ',')
+      "--warmup-steps"
+        help = "Time steps taken before timing starts"
+        arg_type = Int
+        default = 10
+      "--steps"
+        help = "Time steps timed"
+        arg_type = Int
+        default = 20
+    end
+    return parse_args(s)
+end
+
+args = parse_commandline()
+ngpus = args["ngpus"]
+grid_type = args["grid"]
+preconditioners = split(args["preconditioners"], ',')
+
+arch = benchmark_architecture()
+local_rank = MPI.Comm_rank(MPI.COMM_WORLD)
+
+Nx, Ny, Nz = gpu_block_size(grid_type)
+
+warmup_nsteps = args["warmup-steps"]
+nsteps = args["steps"]
+
+mkpath("./reports/")
+FILE_PATH = joinpath("./reports/", "weakscaling_front_$(gpu_model())$(output_suffix(grid_type)).jld2")
+prefix = "$(ngpus)gpu/rank_$(local_rank)/"
+
+for precond_name in preconditioners
+    if MPI.Allreduce(Int(key_exists(FILE_PATH, "$(prefix)times/$precond_name")), min, MPI.COMM_WORLD) == 1
+        @info "Skipping $precond_name on rank $local_rank (already benchmarked)"
+        continue
+    end
+    @info "Benchmarking $precond_name on rank $local_rank"
+
+    grid = setup_grid(arch, grid_type, ngpus * Nx, Ny, Nz)
+    model = setup_model(grid, build_solver(grid, precond_name); seed = 1234 + local_rank)
+
+    # Buoyancy front across the whole domain, so the flow has structure at the domain scale
+    Lx = ngpus * Nx * minimum_xspacing(grid)
+    Random.seed!(1234 + local_rank)
+    set!(model, b = (x, y, z) -> rand() * 1e-2 - z + 0.5 + tanh((x - Lx / 2) / (Lx / 20)) / 4)
+
+    results = benchmark_time_steps!(model, stable_timestep(grid), nsteps; warmup=warmup_nsteps)
+    save_benchmark!(FILE_PATH, results, precond_name; prefix)
+
+    grid = nothing
+    model = nothing
+    GC.gc()
+    CUDA.reclaim()
+end
