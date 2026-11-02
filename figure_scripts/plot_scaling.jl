@@ -10,11 +10,11 @@ colors = Makie.wong_colors();
 linewidth = 4
 markersize = 13
 
-for kind in ("weak", "strong")
+for kind in ("weak", "strong"), (case, case_title) in ("" => "", "_front" => ", buoyancy front")
     fig = Figure(size=(1500, 1300), fontsize=20)
 
     for (row, (grid, suffix)) in enumerate(GRIDS)
-        data = scaling_benchmark_means("./reports/$(kind)scaling_A100$suffix.jld2")
+        data = scaling_benchmark_means("./reports/$(kind)scaling$(case)_A100$suffix.jld2")
         points = join(data.local_sizes[1], " × ") * (kind == "weak" ? " per GPU" : " in total")
         axis_kw = (; xlabel="GPUs", xscale=log2, xticks=data.ngpus, title="$grid, $points")
         axtime = Axis(fig[row, 1]; axis_kw..., ylabel="Wall time per timestep (s)", yscale=log10)
@@ -36,9 +36,9 @@ for kind in ("weak", "strong")
     end
 
     Legend(fig[length(GRIDS) + 1, :], content(fig[1, 1]), nbanks=3, orientation=:horizontal, patchsize=(40, 20))
-    Label(fig[0, :], "$(titlecase(kind)) scaling benchmark (NVIDIA A100)", font=:bold)
+    Label(fig[0, :], "$(titlecase(kind)) scaling benchmark$case_title (NVIDIA A100)", font=:bold)
 
     display(fig)
-    save("./Output/$(kind)scaling_A100.png", fig, px_per_unit=2)
+    save("./Output/$(kind)scaling$(case)_A100.png", fig, px_per_unit=2)
 end
 #%%
