@@ -45,10 +45,10 @@ arch = GPU()
 Nx_max, _, Nz = gpu_block_size(grid_type)
 
 if grid_type == "isotropic"
-    square_sides = (16, 32, 64, 128, 256, 512, 600)
+    square_sides = (32, 64, 128, 256, 512, 600)
     strip_lengths, strip_width = (128, 512, 2048, 8192, 11250), 32
 else
-    square_sides = (16, 32, 64, 128, 256, 300)
+    square_sides = (32, 64, 128, 256, 300)
     strip_lengths, strip_width = (64, 256, 1024, 4096, 5625), 16
 end
 
