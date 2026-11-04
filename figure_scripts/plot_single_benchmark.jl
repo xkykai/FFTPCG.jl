@@ -3,9 +3,11 @@ using Makie
 
 include("single_benchmark_medians.jl")
 
-# Usage: julia --project figure_scripts/plot_single_benchmark.jl [isotropic|anisotropic|stretched]
+# Usage: julia --project figure_scripts/plot_single_benchmark.jl [isotropic|anisotropic|stretched] [front]
 grid = get(ARGS, 1, "isotropic")
-data = single_benchmark_medians(grid, "square")
+front = get(ARGS, 2, "") == "front"
+data = single_benchmark_medians(grid, "square"; front)
+case, case_title = front ? ("_front", ", buoyancy front") : ("", "")
 
 #%%
 colors = Makie.wong_colors();
@@ -27,8 +29,8 @@ for (i, (name, label)) in enumerate(PRECONDITIONER_LABELS)
 end
 
 Legend(fig[2, :], axtime, nbanks=3, orientation=:horizontal, patchsize=(40, 20))
-Label(fig[0, :], "Single GPU Benchmark (NVIDIA H100), $grid grid", font=:bold)
+Label(fig[0, :], "Single GPU Benchmark (NVIDIA H100), $grid grid$case_title", font=:bold)
 
 display(fig)
-save("./Output/benchmark_single_H100_$grid.png", fig, px_per_unit=4)
+save("./Output/benchmark_single$(case)_H100_$grid.png", fig, px_per_unit=4)
 #%%

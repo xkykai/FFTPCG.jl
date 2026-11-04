@@ -3,9 +3,11 @@ using Makie
 
 include("single_benchmark_medians.jl")
 
-# Usage: julia --project figure_scripts/plot_single_benchmark_square_vs_strip.jl [isotropic|anisotropic|stretched]
+# Usage: julia --project figure_scripts/plot_single_benchmark_square_vs_strip.jl [isotropic|anisotropic|stretched] [front]
 grid = get(ARGS, 1, "isotropic")
-data = [single_benchmark_medians(grid, layout) for layout in ("square", "strip")]
+front = get(ARGS, 2, "") == "front"
+data = [single_benchmark_medians(grid, layout; front) for layout in ("square", "strip")]
+case, case_title = front ? ("_front", ", buoyancy front") : ("", "")
 _, strip_width, Nz = data[2].sizes[1]
 
 layout_labels = ["Square (Nx × Nx × $Nz)", "Strip (Nx × $strip_width × $Nz)"]
@@ -34,8 +36,8 @@ layout_entries = [LineElement(; color=:black, linestyle, linewidth) for linestyl
 Legend(fig[2, :], [preconditioner_entries, layout_entries],
        [last.(PRECONDITIONER_LABELS), layout_labels], ["Solver", "Domain"],
        nbanks=3, orientation=:horizontal, patchsize=(40, 20))
-Label(fig[0, :], "Single GPU Benchmark (NVIDIA H100), $grid grid: square vs strip domains", font=:bold)
+Label(fig[0, :], "Single GPU Benchmark (NVIDIA H100), $grid grid$case_title: square vs strip domains", font=:bold)
 
 display(fig)
-save("./Output/benchmark_single_H100_$(grid)_square_vs_strip.png", fig, px_per_unit=4)
+save("./Output/benchmark_single$(case)_H100_$(grid)_square_vs_strip.png", fig, px_per_unit=4)
 #%%

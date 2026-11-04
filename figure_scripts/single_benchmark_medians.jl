@@ -9,15 +9,17 @@ const PRECONDITIONER_LABELS = ["no" => "No preconditioner",
                                "FFT" => "FFT only"]
 
 """
-    single_benchmark_medians(grid, layout)
+    single_benchmark_medians(grid, layout; front=false)
 
 Grid `sizes`, total grid points `N`, and the median wall time [s] and CG iterations per time
 step of every preconditioner benchmarked on the `layout` (`"square"` or `"strip"`) domains of
-the `grid` (`"isotropic"`, `"anisotropic"` or `"stretched"`), ordered by `N`. Preconditioners
-missing at a size are `NaN`.
+the `grid` (`"isotropic"`, `"anisotropic"` or `"stretched"`), with a buoyancy front if `front`,
+ordered by `N`. Preconditioners missing at a size are `NaN`.
 """
-function single_benchmark_medians(grid, layout)
-    file_path = grid == "isotropic" ? "./reports/single_H100.jld2" : "./reports/single_H100_$grid.jld2"
+function single_benchmark_medians(grid, layout; front=false)
+    case = front ? "single_front" : "single"
+    suffix = grid == "isotropic" ? "" : "_$grid"
+    file_path = "./reports/$(case)_H100$suffix.jld2"
 
     jldopen(file_path, "r") do file
         Nxs = sort(parse.(Int, keys(file[layout])))
