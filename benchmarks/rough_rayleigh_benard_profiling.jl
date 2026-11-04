@@ -66,6 +66,7 @@ report("model built: preconditioner $precond_name, at most $(args["maxiter"]) CG
 function timed_step!(model, Δt, comm)
     stats = @timed begin
         time_step!(model, Δt)
+        GC.gc(false)
         CUDA.synchronize()
         MPI.Barrier(comm)
     end
