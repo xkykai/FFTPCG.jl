@@ -95,6 +95,7 @@ statprof
 /batch_scripts
 /logs
 /figure_data*
+/.claude/worktrees
 
 # Keep media
 !media/*

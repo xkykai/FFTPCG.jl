@@ -9,23 +9,23 @@ const PRECONDITIONER_LABELS = ["no" => "No preconditioner",
                                "FFT" => "FFT only"]
 
 """
-    single_benchmark_medians(file_path, layout; strip_width, Nz)
+    single_benchmark_medians(file_path, layout)
 
-Total grid points `N` and the median wall time [s] and CG iterations per time step of every
-preconditioner benchmarked on the `layout` (`"square"` or `"strip"`) grids in `file_path`,
-ordered by `N`.
+Grid `sizes`, total grid points `N`, and the median wall time [s] and CG iterations per time
+step of every preconditioner benchmarked on the `layout` (`"square"` or `"strip"`) grids in
+`file_path`, ordered by `N`.
 """
-function single_benchmark_medians(file_path, layout; strip_width, Nz)
+function single_benchmark_medians(file_path, layout)
     jldopen(file_path, "r") do file
         Nxs = sort(parse.(Int, keys(file[layout])))
-        Ny = layout == "square" ? Nxs : strip_width
-        N = Nxs .* Ny .* Nz
+        sizes = [file["$layout/$Nx/size/FFT"] for Nx in Nxs]
+        N = prod.(sizes)
 
         time = Dict(name => [median(t.time for t in file["$layout/$Nx/times/$name"]) for Nx in Nxs]
                     for (name, _) in PRECONDITIONER_LABELS)
         iterations = Dict(name => [median(file["$layout/$Nx/cg_iters/$name"]) for Nx in Nxs]
                           for (name, _) in PRECONDITIONER_LABELS)
 
-        return (; N, time, iterations)
+        return (; sizes, N, time, iterations)
     end
 end

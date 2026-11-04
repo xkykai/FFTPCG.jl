@@ -27,7 +27,7 @@ function parse_commandline()
       "--warmup-steps"
         help = "Time steps taken before timing starts"
         arg_type = Int
-        default = 50
+        default = 10
       "--steps"
         help = "Time steps timed"
         arg_type = Int

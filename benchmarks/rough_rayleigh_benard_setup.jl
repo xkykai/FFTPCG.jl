@@ -2,6 +2,7 @@ using Oceananigans
 using Oceananigans.Models.NonhydrostaticModels: ConjugateGradientPoissonSolver, nonhydrostatic_pressure_solver
 using Oceananigans.Solvers: DiagonallyDominantPreconditioner, ColumnwiseTridiagonalPreconditioner
 using Oceananigans.Grids: with_number_type
+using Oceananigans.DistributedComputations: partition
 using Random
 
 include("../utils/construct_stretched_spacing.jl")
@@ -13,26 +14,6 @@ const GRID_TYPES = ("isotropic", "anisotropic", "stretched")
 const PRECONDITIONERS = ("FFT", "no", "FFT64", "FFT32", "DiagonallyDominant", "ColumnwiseTridiagonal")
 
 output_suffix(grid_type) = grid_type == "isotropic" ? "" : "_$grid_type"
-
-@inline function local_roughness_bottom(η, η₀, h)
-    if η > η₀ - h && η <= η₀
-        return η + h - η₀
-    elseif η > η₀ && η <= η₀ + h
-        return -η + h + η₀
-    else
-        return 0
-    end
-end
-
-@inline function local_roughness_top(η, η₀, h)
-    if η > η₀ - h && η <= η₀
-        return -η - h + η₀
-    elseif η > η₀ && η <= η₀ + h
-        return η - h - η₀
-    else
-        return 0
-    end
-end
 
 function build_solver(grid, precond_name)
     precond_name == "FFT" && return nothing
@@ -91,25 +72,12 @@ function setup_grid(arch, grid_type, Nx, Ny, Nz)
                            topology = (Bounded, Bounded, Bounded))
 
     h = 8 / N # pyramid height and half-width
-    x₀s = h:2h:Lx-h
-    y₀s = h:2h:Ly-h
+    ϵ = 1e-9 * h # cell centres on a pyramid face are solid despite rounding
 
-    # Woven pattern: ridges in x and y directions create pyramids
-    @inline function roughness_bottom(x, y, z)
-        z_rough_x = sum([local_roughness_bottom(x, x₀, h) for x₀ in x₀s])
-        z_rough_y = sum([local_roughness_bottom(y, y₀, h) for y₀ in y₀s])
-        z_rough = min(z_rough_x, z_rough_y)
-        return z <= z_rough
-    end
-
-    @inline function roughness_top(x, y, z)
-        z_rough_x = sum([local_roughness_top(x, x₀, h) for x₀ in x₀s])
-        z_rough_y = sum([local_roughness_top(y, y₀, h) for y₀ in y₀s])
-        z_rough = max(z_rough_x, z_rough_y)
-        return z >= z_rough + Lz
-    end
-
-    @inline mask(x, y, z) = roughness_bottom(x, y, z) | roughness_top(x, y, z)
+    # Pyramids where triangle waves of period 2h in x and y cross
+    @inline triangle(η) = h - abs(mod(η, 2h) - h)
+    @inline pyramid(x, y) = min(triangle(x), triangle(y)) + ϵ
+    @inline mask(x, y, z) = (z <= pyramid(x, y)) | (z >= Lz - pyramid(x, y))
 
     return ImmersedBoundaryGrid(grid, GridFittedBoundary(mask))
 end
@@ -119,7 +87,7 @@ function stable_timestep(grid)
     return min(Δz, Δz^2 / max(ν, κ)) / 3
 end
 
-function setup_model(grid, pressure_solver; seed = 1234)
+function setup_model(grid, pressure_solver; seed = 1234, global_size = nothing)
     closure = ScalarDiffusivity(ν=ν, κ=κ)
 
     @inline function rayleigh_benard_buoyancy(x, y, z, t)
@@ -143,8 +111,28 @@ function setup_model(grid, pressure_solver; seed = 1234)
                                 boundary_conditions = (u=u_bcs, v=v_bcs, w=w_bcs, b=b_bcs))
 
     Random.seed!(seed)
-    bᵢ(x, y, z) = rand() * 1e-2 - z + 0.5
-    set!(model, b=bᵢ)
+    if isnothing(global_size)
+        bᵢ(x, y, z) = rand() * 1e-2 - z + 0.5
+        set!(model, b=bᵢ)
+    else
+        # Noise drawn for the whole `global_size` grid, so every partition of it starts from the same field
+        z = reshape(Array(znodes(grid, Center())), 1, 1, :)
+        b = rand(global_size...) .* 1e-2 .- z .+ 0.5
+        set!(model, b = partition(b, model.tracers.b))
+    end
 
+    return model
+end
+
+"""
+    add_buoyancy_front!(model, Lx)
+
+Add a buoyancy front `tanh((x - Lx/2) / (Lx/20)) / 4` across a domain of length `Lx`.
+"""
+function add_buoyancy_front!(model, Lx)
+    front = CenterField(model.grid)
+    set!(front, (x, y, z) -> tanh((x - Lx / 2) / (Lx / 20)) / 4)
+    interior(model.tracers.b) .+= interior(front)
+    set!(model, b = model.tracers.b)
     return model
 end
