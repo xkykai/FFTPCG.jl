@@ -3,7 +3,6 @@ using Oceananigans
 using JLD2
 using CUDA
 using ArgParse
-using Random
 
 include("benchmark_utils.jl")
 include("rough_rayleigh_benard_setup.jl")
@@ -64,10 +63,7 @@ for precond_name in preconditioners
     grid = setup_grid(arch, grid_type, ngpus * Nx, Ny, Nz)
     model = setup_model(grid, build_solver(grid, precond_name); seed = 1234 + local_rank)
 
-    # Buoyancy front across the whole domain, so the flow has structure at the domain scale
-    Lx = ngpus * Nx * minimum_xspacing(grid)
-    Random.seed!(1234 + local_rank)
-    set!(model, b = (x, y, z) -> rand() * 1e-2 - z + 0.5 + tanh((x - Lx / 2) / (Lx / 20)) / 4)
+    add_buoyancy_front!(model, ngpus * Nx * minimum_xspacing(grid))
 
     results = benchmark_time_steps!(model, stable_timestep(grid), nsteps; warmup=warmup_nsteps)
     save_benchmark!(FILE_PATH, results, precond_name; prefix)

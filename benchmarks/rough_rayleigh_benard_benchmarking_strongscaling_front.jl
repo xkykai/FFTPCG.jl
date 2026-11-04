@@ -63,12 +63,7 @@ for precond_name in preconditioners
     grid = setup_grid(arch, grid_type, Nx, Ny, Nz)
     model = setup_model(grid, build_solver(grid, precond_name); global_size = (Nx, Ny, Nz))
 
-    # Buoyancy front across the whole domain, so the flow has structure at the domain scale
-    Lx = Nx * minimum_xspacing(grid)
-    front = CenterField(grid)
-    set!(front, (x, y, z) -> tanh((x - Lx / 2) / (Lx / 20)) / 4)
-    interior(model.tracers.b) .+= interior(front)
-    set!(model, b = model.tracers.b)
+    add_buoyancy_front!(model, Nx * minimum_xspacing(grid))
 
     results = benchmark_time_steps!(model, stable_timestep(grid), nsteps; warmup=warmup_nsteps)
     save_benchmark!(FILE_PATH, results, precond_name; prefix)
