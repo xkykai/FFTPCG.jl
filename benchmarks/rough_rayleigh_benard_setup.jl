@@ -123,3 +123,16 @@ function setup_model(grid, pressure_solver; seed = 1234, global_size = nothing)
 
     return model
 end
+
+"""
+    add_buoyancy_front!(model, Lx)
+
+Add a buoyancy front `tanh((x - Lx/2) / (Lx/20)) / 4` across a domain of length `Lx`.
+"""
+function add_buoyancy_front!(model, Lx)
+    front = CenterField(model.grid)
+    set!(front, (x, y, z) -> tanh((x - Lx / 2) / (Lx / 20)) / 4)
+    interior(model.tracers.b) .+= interior(front)
+    set!(model, b = model.tracers.b)
+    return model
+end
