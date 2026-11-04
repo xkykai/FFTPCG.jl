@@ -6,7 +6,7 @@ include("single_benchmark_medians.jl")
 # Usage: julia --project figure_scripts/plot_single_benchmark_square_vs_strip.jl [isotropic|anisotropic|stretched]
 grid = get(ARGS, 1, "isotropic")
 data = [single_benchmark_medians(grid, layout) for layout in ("square", "strip")]
-(; strip_width, Nz) = first(data)
+_, strip_width, Nz = data[2].sizes[1]
 
 layout_labels = ["Square (Nx × Nx × $Nz)", "Strip (Nx × $strip_width × $Nz)"]
 linestyles = [:solid, :dash]
