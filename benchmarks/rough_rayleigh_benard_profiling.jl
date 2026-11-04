@@ -1,3 +1,18 @@
+# Profile one weak-scaling configuration with Nsight Systems, one report per rank:
+#
+#   mpiexec -n 2 nsys profile --trace=cuda,nvtx --capture-range=cudaProfilerApi --capture-range-end=stop \
+#       --output=rank_%q{PMI_RANK} julia --project benchmarks/rough_rayleigh_benard_profiling.jl \
+#       --grid stretched --preconditioner FFT32
+#
+# `nsys` comes with the CUDA toolkit (`module load nvhpc cuda` on Derecho). `--capture-range=cudaProfilerApi`
+# records only the profiled steps, each in an NVTX range `time step <n>`. Without `nsys` the script only
+# prints timings.
+#
+# - Set `JULIA_CUDA_MEMORY_POOL=none`: Cray MPICH can't share pool-allocated memory between ranks.
+# - Don't add `--trace=mpi`: it breaks MPI through MPItrampoline.
+# - If `using MPI` fails under `nsys` with an `OPENSSL_3.3.0` error, add
+#   `--env-var=LD_PRELOAD=<Julia's lib/julia/libcrypto.so.3>`.
+
 t₀ = time()
 
 using MPI
