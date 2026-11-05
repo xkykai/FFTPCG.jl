@@ -13,8 +13,8 @@ markersize = 8
 letters = 'a':'z'
 decades = (10.0 .^ (-3:9), [rich("10", superscript(replace(string(n), "-" => "−"))) for n in -3:9])
 powers_of_two = (2.0 .^ (0:2:40), [rich("2", superscript(string(n))) for n in 0:2:40])
-linestyles = [:solid, :dot]
-domains = [LineElement(; color=:black, linestyle, linewidth) for linestyle in linestyles]
+domain_styles = [(; linestyle=:solid, linewidth), (; linestyle=:dot, linewidth=1.8linewidth)]
+domains = [LineElement(; color=:black, style...) for style in domain_styles]
 legend_kw = (; tellwidth=false, framevisible=false, patchsize=(24, 10), colgap=10, rowgap=0, padding=(0, 0, 0, 0))
 
 for case in ("", "_front"), layouts in (["square"], ["square", "strip"])
@@ -37,9 +37,8 @@ for case in ("", "_front"), layouts in (["square"], ["square", "strip"])
                         for row in 1:3]
         axtime, axiters, axratio = axes[:, col]
 
-        for (d, linestyle) in zip(data, linestyles), (i, (name, label)) in enumerate(PRECONDITIONER_LABELS)
-            linestyle = linestyle == :solid && name == "FFT" ? :dash : linestyle
-            kw = (; label, linewidth, markersize, color=colors[i], marker=markers[i], linestyle)
+        for (d, style) in zip(data, domain_styles), (i, (name, label)) in enumerate(PRECONDITIONER_LABELS)
+            kw = (; label=d === data[1] ? label : nothing, markersize, color=colors[i], marker=markers[i], style...)
 
             scatterlines!(axtime, d.N, d.time[name]; kw...)
             name == "FFT" && continue
@@ -64,7 +63,7 @@ for case in ("", "_front"), layouts in (["square"], ["square", "strip"])
         hideydecorations!(ax; ticks=false, minorticks=false)
     end
 
-    Legend(fig[4, 1:length(GRIDS)], axes[1, 1]; orientation=:horizontal, nbanks=3, merge=true, legend_kw...)
+    Legend(fig[4, 1:length(GRIDS)], axes[1, 1]; orientation=:horizontal, nbanks=3, legend_kw...)
     length(layouts) == 2 && Legend(fig[5, 1:length(GRIDS)], domains, ["Square domain", "Strip domain"];
                                    orientation=:horizontal, legend_kw...)
 
