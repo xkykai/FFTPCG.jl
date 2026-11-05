@@ -38,7 +38,8 @@ for case in ("", "_front"), layouts in (["square"], ["square", "strip"])
         axtime, axiters, axratio = axes[:, col]
 
         for (d, style) in zip(data, domain_styles), (i, (name, label)) in enumerate(PRECONDITIONER_LABELS)
-            kw = (; label=d === data[1] ? label : nothing, markersize, color=colors[i], marker=markers[i], style...)
+            kw = (; label=d === data[1] ? label : nothing, markersize, color=colors[i], marker=markers[i], style...,
+                  linestyle=name == "FFT" && style.linestyle == :solid ? :dash : style.linestyle)
 
             scatterlines!(axtime, d.N, d.time[name]; kw...)
             name == "FFT" && continue
