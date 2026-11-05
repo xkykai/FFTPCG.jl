@@ -13,7 +13,7 @@ markersize = 8
 letters = 'a':'z'
 decades = (10.0 .^ (-3:9), [rich("10", superscript(replace(string(n), "-" => "−"))) for n in -3:9])
 powers_of_two = (2.0 .^ (0:2:40), [rich("2", superscript(string(n))) for n in 0:2:40])
-linestyles = [:solid, :dash]
+linestyles = [:solid, :dot]
 
 for case in ("", "_front"), layouts in (["square"], ["square", "strip"])
     fig = Figure(size=(510, 540), fontsize=9, figure_padding=(2, 8, 2, 4))
@@ -36,7 +36,7 @@ for case in ("", "_front"), layouts in (["square"], ["square", "strip"])
         axtime, axiters, axratio = axes[:, col]
 
         for (d, linestyle) in zip(data, linestyles), (i, (name, label)) in enumerate(PRECONDITIONER_LABELS)
-            linestyle = length(layouts) == 1 && name == "FFT" ? :dot : linestyle
+            linestyle = linestyle == :solid && name == "FFT" ? :dash : linestyle
             kw = (; label, linewidth, markersize, color=colors[i], marker=markers[i], linestyle)
 
             scatterlines!(axtime, d.N, d.time[name]; kw...)
