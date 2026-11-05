@@ -29,7 +29,6 @@ cg = load_solver_output("CG")
 fft = load_solver_output("FFT")
 
 xC = xnodes(cg.grid, Center())
-zC = znodes(cg.grid, Center())
 zF = znodes(cg.grid, Face())
 
 #%%
@@ -37,7 +36,7 @@ pmax = nanmaximum(abs.([cg.p; fft.p]))
 
 panels = [(:b, "Buoyancy",                 Reverse(:roma), nanextrema([cg.b; fft.b]), ((0, 1), (0, 1))),
           (:p, "Pressure deviation",       :vik,           (-pmax, pmax),               ((0, 1), (0, 1))),
-          (:d, "log₁₀ |∇·u|, one wedge",  :inferno,       (-14, 1),                    ((3/16, 5/16), (0.5, 1)))]
+          (:d, "log₁₀ |∇·u| in box",       :inferno,       (-14, 1),                    ((0.15, 0.35), (0.45, 1)))]
 
 solvers = [(cg, "FFT-preconditioned CG", Makie.wong_colors()[3]),
            (fft, "FFT only (inexact solution)", :gray60)]
@@ -58,12 +57,12 @@ let
                       titlegap = 2,
                       aspect = 1,
                       limits,
-                      xticks = WilkinsonTicks(3, k_min=3),
+                      xticks = WilkinsonTicks(3, k_min=2, k_max=3),
                       yticks = 0:0.25:1,
                       xlabel = "x",
                       ylabel = "z")
 
-            hm = heatmap!(ax, xC, zC, output[name]; colormap, colorrange, nan_color=:gray75)
+            hm = heatmap!(ax, xC, zF, output[name]; colormap, colorrange, nan_color=:gray75)
             Colorbar(fig[2i, 2j], hm; width=5, ticklabelsize=8, ticksize=3)
             axes[i, j] = ax
         end
@@ -71,6 +70,11 @@ let
 
     linkaxes!(axes[:, 1:2]...)
     linkaxes!(axes[:, 3]...)
+
+    (x₁, x₂), (z₁, z₂) = last(last(panels))
+    for ax in axes[:, 2]
+        lines!(ax, [x₁, x₂, x₂, x₁, x₁], [z₁, z₁, z₂, z₂, z₁]; color=:black, linewidth=0.8)
+    end
 
     for ax in axes[1, :]
         hidexdecorations!(ax, ticks=false)
