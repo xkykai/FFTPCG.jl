@@ -26,11 +26,8 @@ for case in ("", "_front"), layouts in (["square"], ["square", "strip"])
         data = [single_benchmark_medians(grid, layout; front=case == "_front") for layout in layouts]
         _, Ny, Nz = last(data).sizes[1]
         Label(fig[-1, col], title; font=:bold, tellwidth=false)
-        if length(layouts) == 1
-            Label(fig[0, col], "Nx² × $Nz"; tellwidth=false)
-        else
-            Legend(fig[0, col], domains, ["Square (Nx² × $Nz)", "Strip (Nx × $Ny × $Nz)"]; tellheight=true, legend_kw...)
-        end
+        dimensions = length(layouts) == 1 ? "Nx² × $Nz" : "Square: Nx² × $Nz\nStrip: Nx × $Ny × $Nz"
+        Label(fig[0, col], dimensions; tellwidth=false)
 
         axis_kw = (; titlealign=:left, titlesize=9, titlegap=2, xscale=log2, xticks=powers_of_two, xlabel="Grid points",
                      xgridvisible=false, ygridvisible=false, xminorticksvisible=false,
@@ -68,6 +65,8 @@ for case in ("", "_front"), layouts in (["square"], ["square", "strip"])
     end
 
     Legend(fig[4, 1:length(GRIDS)], axes[1, 1]; orientation=:horizontal, nbanks=3, merge=true, legend_kw...)
+    length(layouts) == 2 && Legend(fig[5, 1:length(GRIDS)], domains, ["Square domain", "Strip domain"];
+                                   orientation=:horizontal, legend_kw...)
 
     colgap!(fig.layout, 8)
     rowgap!(fig.layout, 6)
