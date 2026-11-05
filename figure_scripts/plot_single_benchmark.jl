@@ -23,7 +23,7 @@ for case in ("", "_front"), layouts in (["square"], ["square", "strip"])
     for (col, (title, grid)) in enumerate(GRIDS)
         data = [single_benchmark_medians(grid, layout; front=case == "_front") for layout in layouts]
         _, Ny, Nz = last(data).sizes[1]
-        points = length(layouts) == 1 ? "Nx × Nx × $Nz" : "Nz = $Nz, strip Ny = $Ny"
+        points = length(layouts) == 1 ? "Nx² × $Nz" : "Nz = $Nz, strip Ny = $Ny"
         Label(fig[-1, col], title; font=:bold, tellwidth=false)
         Label(fig[0, col], points; tellwidth=false)
 
@@ -67,7 +67,7 @@ for case in ("", "_front"), layouts in (["square"], ["square", "strip"])
     Legend(fig[4, 1:length(GRIDS)], axes[1, 1]; nbanks=3, merge=true, legend_kw...)
     if length(layouts) == 2
         domains = [LineElement(; color=:black, linestyle, linewidth) for linestyle in linestyles]
-        Legend(fig[5, 1:length(GRIDS)], domains, ["Square domain (Nx × Nx × Nz)", "Strip domain (Nx × Ny × Nz)"];
+        Legend(fig[5, 1:length(GRIDS)], domains, ["Square domain (Nx² × Nz)", "Strip domain (Nx × Ny × Nz)"];
                legend_kw...)
     end
 
