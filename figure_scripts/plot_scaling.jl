@@ -6,7 +6,7 @@ include("scaling_benchmark_means.jl")
 const GRIDS = ["Isotropic" => "", "Anisotropic" => "_anisotropic", "Stretched" => "_stretched"]
 
 #%%
-colors = Makie.wong_colors()
+colors = [Makie.wong_colors()[1:5]; :gray60]
 markers = [:circle, :rect, :utriangle, :diamond, :dtriangle, :star5]
 linewidth = 1.8
 markersize = 8
@@ -35,7 +35,8 @@ for kind in ("weak", "strong"), case in ("", "_front")
         hlines!(axefficiency, 1; color=:gray60, linewidth=1, linestyle=:dash)
 
         for (i, (name, label)) in enumerate(PRECONDITIONER_LABELS)
-            kw = (; label, linewidth, markersize, color=colors[i], marker=markers[i], linestyle=name == "FFT" ? :dash : :solid)
+            kw = (; label, linewidth, markersize, color=colors[i], marker=markers[i],
+                  (name == "FFT" ? (; markercolor=:white, strokecolor=colors[i], strokewidth=1) : (;))...)
             time = data.time[name]
             efficiency = kind == "weak" ? time[1] ./ time : time[1] ./ (data.ngpus .* time)
 
