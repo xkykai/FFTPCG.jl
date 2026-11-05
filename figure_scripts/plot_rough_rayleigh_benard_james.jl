@@ -44,7 +44,7 @@ solvers = [(cg, "FFT-preconditioned CG", Makie.wong_colors()[3], 1e-9),
            (fft, "FFT only (inexact solution)", :gray60, 0.5)]
 
 let
-    fig = Figure(size=(510, 520), fontsize=9, figure_padding=(4, 8, 4, 4))
+    fig = Figure(size=(510, 450), fontsize=9, figure_padding=(4, 8, 4, 4))
     letters = 'a':'z'
     axes = Matrix{Axis}(undef, length(solvers), length(panels))
 
@@ -57,7 +57,6 @@ let
                       titlefont = :regular,
                       titlealign = :left,
                       titlegap = 2,
-                      aspect = 1,
                       limits,
                       xticks = WilkinsonTicks(3, k_min=2, k_max=3),
                       yticks = 0:0.25:1,
@@ -113,9 +112,14 @@ let
            orientation=:horizontal, tellwidth=false, framevisible=false, patchsize=(24, 10), colgap=10,
            padding=(0, 0, 0, 0))
 
-    rowsize!(fig.layout, 2length(solvers) + 1, Relative(0.28))
+    for i in eachindex(solvers)
+        rowsize!(fig.layout, 2i, Aspect(1, 1))
+    end
+
     rowgap!(fig.layout, 4)
     colgap!(fig.layout, 4)
+    colgap!(fig.layout, 2, 10)
+    colgap!(fig.layout, 4, 10)
 
     display(fig)
     save("./Output/rough_rayleigh_benard_james.pdf", fig, pt_per_unit=1)
