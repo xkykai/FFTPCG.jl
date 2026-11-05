@@ -21,7 +21,7 @@ function load_solver_output(solver)
         interior(φ, :, 1, :)
     end
 
-    return (; b, p = p .- nanmean(p), d = log10.(max.(abs.(d), 1e-14)),
+    return (; b, p = p .- nanmean(p), d,
               Nu = interior(Nu[end], 1, 1, :), Nu.grid, KE_times = KE.times, KE = interior(KE, 1, 1, 1, :))
 end
 
@@ -32,11 +32,13 @@ xC = xnodes(cg.grid, Center())
 zF = znodes(cg.grid, Face())
 
 #%%
+superscript_minus(e) = replace(string(e), "-" => "−")
+
 pmax = nanmaximum(abs.([cg.p; fft.p]))
 
 panels = [(:b, "Buoyancy",                 Reverse(:roma), nanextrema([cg.b; fft.b]), ((0, 1), (0, 1))),
           (:p, "Pressure deviation",       :vik,           (-pmax, pmax),               ((0, 1), (0, 1))),
-          (:d, "log₁₀ |∇·u| in box",       :inferno,       (-14, 1),                    ((0.15, 0.35), (0.45, 1)))]
+          (:d, "Divergence in box",        :balance,       nothing,                     ((0.15, 0.35), (0.45, 1)))]
 
 solvers = [(cg, "FFT-preconditioned CG", Makie.wong_colors()[3]),
            (fft, "FFT only (inexact solution)", :gray60)]
@@ -62,8 +64,15 @@ let
                       xlabel = "x",
                       ylabel = "z")
 
-            hm = heatmap!(ax, xC, zF, output[name]; colormap, colorrange, nan_color=:gray75)
-            Colorbar(fig[2i, 2j], hm; width=5, ticklabelsize=8, ticksize=3)
+            φ = output[name]
+            colorrange = something(colorrange, (-1, 1) .* nanpctile(abs.(φ), 99))
+            e = floor(Int, log10(last(colorrange)))
+            e = e < -1 ? e : 0
+            φ, colorrange = φ ./ 10.0^e, colorrange ./ 10.0^e
+            label = e == 0 ? "" : rich("×10", superscript(superscript_minus(e)))
+
+            hm = heatmap!(ax, xC, zF, φ; colormap, colorrange, nan_color=:gray75)
+            Colorbar(fig[2i, 2j], hm; label, width=5, ticklabelsize=8, labelpadding=2, ticksize=3)
             axes[i, j] = ax
         end
     end
