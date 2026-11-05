@@ -14,6 +14,8 @@ letters = 'a':'z'
 decades = (10.0 .^ (-3:9), [rich("10", superscript(replace(string(n), "-" => "−"))) for n in -3:9])
 powers_of_two = (2.0 .^ (0:2:40), [rich("2", superscript(string(n))) for n in 0:2:40])
 linestyles = [:solid, :dot]
+domains = [LineElement(; color=:black, linestyle, linewidth) for linestyle in linestyles]
+legend_kw = (; tellwidth=false, framevisible=false, patchsize=(24, 10), colgap=10, rowgap=0, padding=(0, 0, 0, 0))
 
 for case in ("", "_front"), layouts in (["square"], ["square", "strip"])
     fig = Figure(size=(510, 540), fontsize=9, figure_padding=(2, 8, 2, 4))
@@ -23,9 +25,12 @@ for case in ("", "_front"), layouts in (["square"], ["square", "strip"])
     for (col, (title, grid)) in enumerate(GRIDS)
         data = [single_benchmark_medians(grid, layout; front=case == "_front") for layout in layouts]
         _, Ny, Nz = last(data).sizes[1]
-        points = length(layouts) == 1 ? "Nx² × $Nz" : "Nz = $Nz, strip Ny = $Ny"
         Label(fig[-1, col], title; font=:bold, tellwidth=false)
-        Label(fig[0, col], points; tellwidth=false)
+        if length(layouts) == 1
+            Label(fig[0, col], "Nx² × $Nz"; tellwidth=false)
+        else
+            Legend(fig[0, col], domains, ["Square (Nx² × $Nz)", "Strip (Nx × $Ny × $Nz)"]; tellheight=true, legend_kw...)
+        end
 
         axis_kw = (; titlealign=:left, titlesize=9, titlegap=2, xscale=log2, xticks=powers_of_two, xlabel="Grid points",
                      xgridvisible=false, ygridvisible=false, xminorticksvisible=false,
@@ -62,14 +67,7 @@ for case in ("", "_front"), layouts in (["square"], ["square", "strip"])
         hideydecorations!(ax; ticks=false, minorticks=false)
     end
 
-    legend_kw = (; orientation=:horizontal, tellwidth=false, framevisible=false, patchsize=(24, 10), colgap=10,
-                   rowgap=0, padding=(0, 0, 0, 0))
-    Legend(fig[4, 1:length(GRIDS)], axes[1, 1]; nbanks=3, merge=true, legend_kw...)
-    if length(layouts) == 2
-        domains = [LineElement(; color=:black, linestyle, linewidth) for linestyle in linestyles]
-        Legend(fig[5, 1:length(GRIDS)], domains, ["Square domain (Nx² × Nz)", "Strip domain (Nx × Ny × Nz)"];
-               legend_kw...)
-    end
+    Legend(fig[4, 1:length(GRIDS)], axes[1, 1]; orientation=:horizontal, nbanks=3, merge=true, legend_kw...)
 
     colgap!(fig.layout, 8)
     rowgap!(fig.layout, 6)
