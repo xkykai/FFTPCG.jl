@@ -35,7 +35,7 @@ for kind in ("weak", "strong"), case in ("", "_front")
         hlines!(axefficiency, 1; color=:gray60, linewidth=1, linestyle=:dash)
 
         for (i, (name, label)) in enumerate(PRECONDITIONER_LABELS)
-            kw = (; label, linewidth, markersize, color=colors[i], marker=markers[i], linestyle=name == "FFT" ? :dash : :solid)
+            kw = (; label, linewidth, markersize, color=colors[i], marker=markers[i])
             time = data.time[name]
             efficiency = kind == "weak" ? time[1] ./ time : time[1] ./ (data.ngpus .* time)
 
