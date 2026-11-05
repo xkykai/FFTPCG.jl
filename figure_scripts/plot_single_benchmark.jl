@@ -12,6 +12,7 @@ linewidth = 1.8
 markersize = 8
 letters = 'a':'z'
 decades = (10.0 .^ (-3:9), [rich("10", superscript(replace(string(n), "-" => "−"))) for n in -3:9])
+powers_of_two = (2.0 .^ (0:2:40), [rich("2", superscript(string(n))) for n in 0:2:40])
 linestyles = [:solid, :dash]
 
 for case in ("", "_front"), layouts in (["square"], ["square", "strip"])
@@ -26,7 +27,7 @@ for case in ("", "_front"), layouts in (["square"], ["square", "strip"])
         Label(fig[-1, col], title; font=:bold, tellwidth=false)
         Label(fig[0, col], points; tellwidth=false)
 
-        axis_kw = (; titlealign=:left, titlesize=9, titlegap=2, xscale=log10, xticks=decades, xlabel="Grid points",
+        axis_kw = (; titlealign=:left, titlesize=9, titlegap=2, xscale=log2, xticks=powers_of_two, xlabel="Grid points",
                      xgridvisible=false, ygridvisible=false, xminorticksvisible=false,
                      yscale=log10, yticks=decades, yminorticks=IntervalsBetween(9), yminorticksvisible=true,
                      yminortickwidth=0.5)
@@ -45,7 +46,10 @@ for case in ("", "_front"), layouts in (["square"], ["square", "strip"])
         end
     end
 
-    linkxaxes!(axes...)
+    for column in eachcol(axes)
+        linkxaxes!(column...)
+    end
+
     for row in 1:3
         linkyaxes!(axes[row, :]...)
     end
