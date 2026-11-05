@@ -6,7 +6,7 @@ include("single_benchmark_medians.jl")
 const GRIDS = ["Isotropic" => "isotropic", "Anisotropic" => "anisotropic", "Stretched" => "stretched"]
 
 #%%
-colors = Makie.wong_colors()
+colors = [Makie.wong_colors()[1:5]; :gray60]
 markers = [:circle, :rect, :utriangle, :diamond, :dtriangle, :star5]
 linewidth = 1.8
 markersize = 8
@@ -39,7 +39,7 @@ for case in ("", "_front"), layouts in (["square"], ["square", "strip"])
 
         for (d, style) in zip(data, domain_styles), (i, (name, label)) in enumerate(PRECONDITIONER_LABELS)
             kw = (; label=d === data[1] ? label : nothing, markersize, color=colors[i], marker=markers[i], style...,
-                  linestyle=name == "FFT" && style.linestyle == :solid ? :dash : style.linestyle)
+                  (name == "FFT" ? (; markercolor=:white, strokecolor=colors[i], strokewidth=1) : (;))...)
 
             scatterlines!(axtime, d.N, d.time[name]; kw...)
             name == "FFT" && continue
