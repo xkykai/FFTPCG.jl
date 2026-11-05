@@ -40,15 +40,15 @@ panels = [(:b, "Buoyancy",                 Reverse(:roma), nanextrema([cg.b; fft
           (:p, "Pressure deviation",       :vik,           (-pmax, pmax),               ((0, 1), (0, 1))),
           (:d, "Divergence in box",        :balance,       nothing,                     ((0.15, 0.35), (0.45, 1)))]
 
-solvers = [(cg, "FFT-preconditioned CG", Makie.wong_colors()[3]),
-           (fft, "FFT only (inexact solution)", :gray60)]
+solvers = [(cg, "FFT-preconditioned CG", Makie.wong_colors()[3], 1e-9),
+           (fft, "FFT only (inexact solution)", :gray60, 0.5)]
 
 let
     fig = Figure(size=(510, 520), fontsize=9, figure_padding=(4, 8, 4, 4))
     letters = 'a':'z'
     axes = Matrix{Axis}(undef, length(solvers), length(panels))
 
-    for (i, (output, title, _)) in enumerate(solvers)
+    for (i, (output, title, _, dmax)) in enumerate(solvers)
         Label(fig[2i-1, 1:2length(panels)], title; font=:bold, fontsize=10, tellwidth=false)
 
         for (j, (name, quantity, colormap, colorrange, limits)) in enumerate(panels)
@@ -65,13 +65,17 @@ let
                       ylabel = "z")
 
             φ = output[name]
-            colorrange = something(colorrange, (-1, 1) .* nanpctile(abs.(φ), 99))
+            colorrange = something(colorrange, (-dmax, dmax))
             e = floor(Int, log10(last(colorrange)))
             e = e < -1 ? e : 0
             φ, colorrange = φ ./ 10.0^e, colorrange ./ 10.0^e
             label = e == 0 ? "" : rich("×10", superscript(superscript_minus(e)))
 
-            hm = heatmap!(ax, xC, zF, φ; colormap, colorrange, nan_color=:gray75)
+            colors = Makie.to_colormap(colormap)
+            lowclip = nanminimum(φ) < first(colorrange) ? first(colors) : Makie.automatic
+            highclip = nanmaximum(φ) > last(colorrange) ? last(colors) : Makie.automatic
+
+            hm = heatmap!(ax, xC, zF, φ; colormap, colorrange, lowclip, highclip, nan_color=:gray75)
             Colorbar(fig[2i, 2j], hm; label, width=5, ticklabelsize=8, labelpadding=2, ticksize=3)
             axes[i, j] = ax
         end
@@ -100,12 +104,12 @@ let
     axKE = Axis(averages[1, 2]; axis_kw..., title=rich(rich("(h) "; font=:bold), "Kinetic energy"),
                 xlabel="t", ylabel="⟨KE⟩")
 
-    handles = map(reverse(solvers)) do (output, _, color)
+    handles = map(reverse(solvers)) do (output, _, color, _)
         lines!(axNu, output.Nu, zF; color, linewidth=1.8)
         lines!(axKE, output.KE_times, output.KE; color, linewidth=1.8)
     end
 
-    Legend(fig[2length(solvers) + 2, 1:2length(panels)], reverse(handles), [title for (_, title, _) in solvers];
+    Legend(fig[2length(solvers) + 2, 1:2length(panels)], reverse(handles), [title for (_, title) in solvers];
            orientation=:horizontal, tellwidth=false, framevisible=false, patchsize=(24, 10), colgap=10,
            padding=(0, 0, 0, 0))
 
