@@ -3,34 +3,77 @@ using Makie
 
 include("single_benchmark_medians.jl")
 
-# Usage: julia --project figure_scripts/plot_single_benchmark.jl [isotropic|anisotropic|stretched] [front]
-grid = get(ARGS, 1, "isotropic")
-front = get(ARGS, 2, "") == "front"
-data = single_benchmark_medians(grid, "square"; front)
-case, case_title = front ? ("_front", ", buoyancy front") : ("", "")
+const GRIDS = ["Isotropic" => "isotropic", "Anisotropic" => "anisotropic", "Stretched" => "stretched"]
 
 #%%
-colors = Makie.wong_colors();
-linewidth = 5
-markersize = 15
-xlabel = "Grid points (Nx × Nx × $(data.sizes[1][3]))"
-fig = Figure(size=(1300, 550), fontsize=23)
-axtime = Axis(fig[1, 1]; xlabel, ylabel="Wall time per timestep (s)", yscale=log10, xscale=log10)
-axiters = Axis(fig[1, 2]; xlabel, ylabel="CG iters per timestep", yscale=log10, xscale=log10)
-axratio = Axis(fig[1, 3]; xlabel, ylabel="Method time /\nFFT-only solve time", yscale=log10, xscale=log10)
+colors = Makie.wong_colors()
+markers = [:circle, :rect, :utriangle, :diamond, :dtriangle, :star5]
+linewidth = 1.8
+markersize = 8
+letters = 'a':'z'
+decades = (10.0 .^ (-3:9), [rich("10", superscript(replace(string(n), "-" => "−"))) for n in -3:9])
+linestyles = [:solid, :dash]
 
-for (i, (name, label)) in enumerate(PRECONDITIONER_LABELS)
-    color = colors[i]
-    linestyle = name == "FFT" ? :dot : :solid
-    scatterlines!(axtime, data.N, data.time[name]; label, linewidth, color, markersize, linestyle)
-    name == "FFT" && continue
-    scatterlines!(axiters, data.N, data.iterations[name]; linewidth, color, markersize)
-    scatterlines!(axratio, data.N, data.time[name] ./ data.time["FFT"]; linewidth, color, markersize)
+for case in ("", "_front"), layouts in (["square"], ["square", "strip"])
+    fig = Figure(size=(510, 540), fontsize=9, figure_padding=(2, 8, 2, 4))
+    ylabels = ["Wall time per time step (s)", "CG iterations per time step", "Time / FFT-only time"]
+    axes = Matrix{Axis}(undef, 3, length(GRIDS))
+
+    for (col, (title, grid)) in enumerate(GRIDS)
+        data = [single_benchmark_medians(grid, layout; front=case == "_front") for layout in layouts]
+        _, Ny, Nz = last(data).sizes[1]
+        points = length(layouts) == 1 ? "Nx × Nx × $Nz" : "Nz = $Nz, strip Ny = $Ny"
+        Label(fig[-1, col], title; font=:bold, tellwidth=false)
+        Label(fig[0, col], points; tellwidth=false)
+
+        axis_kw = (; titlealign=:left, titlesize=9, titlegap=2, xscale=log10, xticks=decades, xlabel="Grid points",
+                     xgridvisible=false, ygridvisible=false, xminorticksvisible=false,
+                     yscale=log10, yticks=decades, yminorticks=IntervalsBetween(9), yminorticksvisible=true,
+                     yminortickwidth=0.5)
+        axes[:, col] = [Axis(fig[row, col]; axis_kw..., title="($(letters[col + 3(row - 1)]))", ylabel=ylabels[row])
+                        for row in 1:3]
+        axtime, axiters, axratio = axes[:, col]
+
+        for (d, linestyle) in zip(data, linestyles), (i, (name, label)) in enumerate(PRECONDITIONER_LABELS)
+            linestyle = length(layouts) == 1 && name == "FFT" ? :dot : linestyle
+            kw = (; label, linewidth, markersize, color=colors[i], marker=markers[i], linestyle)
+
+            scatterlines!(axtime, d.N, d.time[name]; kw...)
+            name == "FFT" && continue
+            scatterlines!(axiters, d.N, d.iterations[name]; kw...)
+            scatterlines!(axratio, d.N, d.time[name] ./ d.time["FFT"]; kw...)
+        end
+    end
+
+    linkxaxes!(axes...)
+    for row in 1:3
+        linkyaxes!(axes[row, :]...)
+    end
+
+    for ax in axes[1:end-1, :]
+        hidexdecorations!(ax; ticks=false)
+    end
+
+    for ax in axes[:, 2:end]
+        hideydecorations!(ax; ticks=false, minorticks=false)
+    end
+
+    legend_kw = (; orientation=:horizontal, tellwidth=false, framevisible=false, patchsize=(24, 10), colgap=10,
+                   rowgap=0, padding=(0, 0, 0, 0))
+    Legend(fig[4, 1:length(GRIDS)], axes[1, 1]; nbanks=3, merge=true, legend_kw...)
+    if length(layouts) == 2
+        domains = [LineElement(; color=:black, linestyle, linewidth) for linestyle in linestyles]
+        Legend(fig[5, 1:length(GRIDS)], domains, ["Square domain (Nx × Nx × Nz)", "Strip domain (Nx × Ny × Nz)"];
+               legend_kw...)
+    end
+
+    colgap!(fig.layout, 8)
+    rowgap!(fig.layout, 6)
+    rowgap!(fig.layout, 1, 2)
+
+    filename = "./Output/benchmark_single$(case)_H100" * (length(layouts) == 1 ? "" : "_square_vs_strip")
+    display(fig)
+    save("$filename.pdf", fig, pt_per_unit=1)
+    save("$filename.png", fig, px_per_unit=6)
 end
-
-Legend(fig[2, :], axtime, nbanks=3, orientation=:horizontal, patchsize=(40, 20))
-Label(fig[0, :], "Single GPU Benchmark (NVIDIA H100), $grid grid$case_title", font=:bold)
-
-display(fig)
-save("./Output/benchmark_single$(case)_H100_$grid.png", fig, px_per_unit=4)
 #%%
