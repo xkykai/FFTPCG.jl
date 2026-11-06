@@ -22,6 +22,15 @@ function parse_commandline()
         help = "Type of pressure solver to use (FFT or CG)"
         arg_type = String
         default = "CG"
+      "--Nx"
+        arg_type = Int
+        default = 512
+      "--Nz"
+        arg_type = Int
+        default = 256
+      "--Ra"
+        arg_type = Float64
+        default = 1e8
     end
     return parse_args(s)
 end
@@ -33,7 +42,7 @@ solver_type = args["solver"]
 
 arch = GPU()
 
-const Ra = 1e8
+const Ra = args["Ra"]
 const Nr = 8
 const g = 1
 const α = 1
@@ -48,8 +57,8 @@ const ν = sqrt(Δb * g * H^3 * Pr / Ra)
 const κ = ν / Pr
 const Lx = 1
 const Lz = 1
-const Nx = 1024
-const Nz = 512
+const Nx = args["Nx"]
+const Nz = args["Nz"]
 
 grid = setup_stretched_grid(; Nr, arch, Nx, Nz)
 
