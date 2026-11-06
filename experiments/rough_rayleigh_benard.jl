@@ -24,10 +24,10 @@ function parse_commandline()
         default = "CG"
       "--Nx"
         arg_type = Int
-        default = 1024
+        default = 512
       "--Nz"
         arg_type = Int
-        default = 512
+        default = 256
       "--Ra"
         arg_type = Float64
         default = 1e8
