@@ -4,10 +4,11 @@ using CairoMakie
 using NaNStatistics
 
 #%%
+filename = "rough_RB_seaiceformation_noslip_periodic_halfdomain_stretched_Ra_1.0e8_Pr_1_Nr_8_Lx_1_Lz_1_Nx_512_Nz_256"
 snapshot_time = 1000
 
-function load_solver_output(resolution, solver)
-    data_dir = "./Data/rough_RB_seaiceformation_noslip_periodic_halfdomain_stretched_Ra_1.0e8_Pr_1_Nr_8_Lx_1_Lz_1_$(resolution)_$(solver)"
+function load_solver_output(solver)
+    data_dir = "./Data/$(filename)_$(solver)"
     fields = NamedTuple(Symbol(name) => FieldTimeSeries("$data_dir/instantaneous_fields.jld2", name; backend=OnDisk())
                         for name in ("b", "p", "d"))
     Nu = FieldTimeSeries("$data_dir/averaged_fields.jld2", "Nu")
@@ -24,25 +25,25 @@ function load_solver_output(resolution, solver)
               Nu = interior(Nu[end], 1, 1, :), Nu.grid, KE_times = KE.times, KE = interior(KE, 1, 1, 1, :))
 end
 
-superscript_minus(e) = replace(string(e), "-" => "−")
+cg = load_solver_output("CG")
+fft = load_solver_output("FFT")
+
+xC = xnodes(cg.grid, Center())
+zF = znodes(cg.grid, Face())
 
 #%%
-for resolution in ("Nx_1024_Nz_512", "Nx_512_Nz_256")
-    cg = load_solver_output(resolution, "CG")
-    fft = load_solver_output(resolution, "FFT")
+superscript_minus(e) = replace(string(e), "-" => "−")
 
-    xC = xnodes(cg.grid, Center())
-    zF = znodes(cg.grid, Face())
+pmax = nanmaximum(abs.([cg.p; fft.p]))
 
-    pmax = nanmaximum(abs.([cg.p; fft.p]))
+panels = [(:b, "Buoyancy",                 Reverse(:roma), nanextrema([cg.b; fft.b]), ((0, 1), (0, 1))),
+          (:p, "Pressure deviation",       :vik,           (-pmax, pmax),               ((0, 1), (0, 1))),
+          (:d, "Divergence in box",        :balance,       nothing,                     ((0.15, 0.35), (0.45, 1)))]
 
-    panels = [(:b, "Buoyancy",                 Reverse(:roma), nanextrema([cg.b; fft.b]), ((0, 1), (0, 1))),
-              (:p, "Pressure deviation",       :vik,           (-pmax, pmax),               ((0, 1), (0, 1))),
-              (:d, "Divergence in box",        :balance,       nothing,                     ((0.15, 0.35), (0.45, 1)))]
+solvers = [(cg, "FFT-preconditioned CG", Makie.wong_colors()[3], 1e-9),
+           (fft, "FFT only (inexact solution)", :gray60, 0.5)]
 
-    solvers = [(cg, "FFT-preconditioned CG", Makie.wong_colors()[3], 1e-9),
-               (fft, "FFT only (inexact solution)", :gray60, 0.5)]
-
+let
     fig = Figure(size=(510, 450), fontsize=9, figure_padding=(4, 8, 4, 4))
     letters = 'a':'z'
     axes = Matrix{Axis}(undef, length(solvers), length(panels))
@@ -121,7 +122,7 @@ for resolution in ("Nx_1024_Nz_512", "Nx_512_Nz_256")
     colgap!(fig.layout, 4, 10)
 
     display(fig)
-    save("./Output/rough_rayleigh_benard_$(resolution)_james.pdf", fig, pt_per_unit=1)
-    save("./Output/rough_rayleigh_benard_$(resolution)_james.png", fig, px_per_unit=6)
+    save("./Output/rough_rayleigh_benard_james.pdf", fig, pt_per_unit=1)
+    save("./Output/rough_rayleigh_benard_james.png", fig, px_per_unit=6)
 end
 #%%
