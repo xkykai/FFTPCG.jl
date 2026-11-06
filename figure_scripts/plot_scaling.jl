@@ -48,7 +48,9 @@ for kind in ("weak", "strong"), case in ("", "_front")
         axes[:, col] = [axtime, axiters, axefficiency]
     end
 
-    linkxaxes!(axes...)
+    for col in 1:length(GRIDS)
+        linkxaxes!(axes[:, col]...)
+    end
     for row in 1:3
         linkyaxes!(axes[row, :]...)
     end
