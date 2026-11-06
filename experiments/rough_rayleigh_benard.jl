@@ -28,6 +28,9 @@ function parse_commandline()
       "--Nz"
         arg_type = Int
         default = 512
+      "--Ra"
+        arg_type = Float64
+        default = 1e8
     end
     return parse_args(s)
 end
@@ -39,7 +42,7 @@ solver_type = args["solver"]
 
 arch = GPU()
 
-const Ra = 1e8
+const Ra = args["Ra"]
 const Nr = 8
 const g = 1
 const α = 1
