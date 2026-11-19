@@ -30,15 +30,21 @@ wet = bottom_k .> 0
 bottom(φ) = [wet[i, j] ? φ[i, j, bottom_k[i, j]] : NaN32 for i in 1:Nx, j in 1:Ny]
 bottom_height = [wet[i, j] ? -hₑ / kilometers + tanα * min(y[j], 0) : 0.0 for i in 1:Nx, j in 1:Ny]
 
-# Height (km) at which the tracer falls below `plume_threshold`, NaN outside the plume
-plume_top = fill(NaN, Nx, Ny)
+# Height (km) at which the tracer falls below `threshold`, NaN where it never exceeds it
+function tracer_surface(threshold)
+    height = fill(NaN, Nx, Ny)
 
-for j in 1:Ny, i in 1:Nx
-    k = findlast(>(plume_threshold), view(c, i, j, :))
-    isnothing(k) && continue
-    above = k < Nz ? (c[i, j, k] - plume_threshold) / (c[i, j, k] - c[i, j, k+1]) : 0
-    plume_top[i, j] = max(z[k] + above * Δz, bottom_height[i, j])
+    for j in 1:Ny, i in 1:Nx
+        k = findlast(>(threshold), view(c, i, j, :))
+        isnothing(k) && continue
+        above = k < Nz ? (c[i, j, k] - threshold) / (c[i, j, k] - c[i, j, k+1]) : 0
+        height[i, j] = max(z[k] + above * Δz, bottom_height[i, j])
+    end
+
+    return height
 end
+
+plume_top = tracer_surface(plume_threshold)
 
 # Contours of bottom buoyancy as lines lying on the surface `height`
 function buoyancy_contours(height)
@@ -60,6 +66,7 @@ end
 #%%
 tracer_kw = (; colormap=:matter, colorrange=(0, 1))
 tracer_colors = Makie.to_colormap(:matter)
+tracer_color(tracer) = tracer_colors[round(Int, 1 + 255 * clamp(tracer, 0, 1))]
 with_alpha(color, alpha) = RGBAf(color.r, color.g, color.b, alpha)
 
 function overflow_axis()
@@ -109,10 +116,23 @@ let
     save("./Output/dense_overflow_3d_glass.png", fig, px_per_unit=2)
 end
 
+#%% Nested surfaces of constant tracer, each in the color of its tracer value
+let
+    fig, ax = overflow_axis()
+    lines!(ax, buoyancy_contours(bottom_height); color=:gray25, linewidth=1.5)
+
+    for (tracer, alpha) in ((0.7, 1), (0.4, 0.35), (0.1, 0.15))
+        color = with_alpha(tracer_color(tracer), alpha)
+        surface!(ax, x, y, tracer_surface(tracer); color=zeros(Nx, Ny), colormap=[color, color], transparency=alpha < 1)
+    end
+
+    save("./Output/dense_overflow_3d_isosurfaces.png", fig, px_per_unit=2)
+end
+
 #%% Volume rendering of the tracer, with opacity proportional to concentration
 let
     fig, ax = overflow_axis()
-    voxel(tracer) = with_alpha(tracer_colors[round(Int, 1 + 255 * clamp(tracer, 0, 1))], clamp(tracer, 0, 1))
+    voxel(tracer) = with_alpha(tracer_color(tracer), clamp(tracer, 0, 1))
     voxels = [isnan(tracer) ? RGBAf(0, 0, 0, 0) : voxel(tracer) for tracer in view(c, 1:3:Nx, 1:3:Ny, :)]
 
     lines!(ax, buoyancy_contours(bottom_height); color=:gray25, linewidth=1.5)
