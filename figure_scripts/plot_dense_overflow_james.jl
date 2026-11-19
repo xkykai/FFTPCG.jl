@@ -29,11 +29,11 @@ i_slice = searchsortedlast(x, x_slice / kilometers)
 y_slice = (-100, 10)
 
 #%%
-let
+for (colormap, suffix) in ((:matter, ""), (:turbo, "_turbo"))
     fig = Figure(size=(510, 158), fontsize=9, figure_padding=(4, 8, 4, 4))
     panel_title(letter, text) = rich(rich("($letter) "; font=:bold), text)
     axis_kw = (; titlefont=:regular, titlealign=:left, titlegap=2, xlabelpadding=1, ylabelpadding=1)
-    tracer_kw = (; colormap=:matter, colorrange=(0, 1), nan_color=:gray75)
+    tracer_kw = (; colormap, colorrange=(0, 1), nan_color=:gray75)
     days = round(Int, snapshot_time / day)
 
     axmap = Axis(fig[1, 1]; axis_kw...,
@@ -64,7 +64,7 @@ let
     colgap!(fig.layout, 2, 4)
 
     display(fig)
-    save("./Output/dense_overflow_james.pdf", fig, pt_per_unit=1)
-    save("./Output/dense_overflow_james.png", fig, px_per_unit=6)
+    save("./Output/dense_overflow_james$suffix.pdf", fig, pt_per_unit=1)
+    save("./Output/dense_overflow_james$suffix.png", fig, px_per_unit=6)
 end
 #%%
