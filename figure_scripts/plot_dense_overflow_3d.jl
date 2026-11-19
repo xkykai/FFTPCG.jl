@@ -63,6 +63,35 @@ function buoyancy_contours(height)
     return points
 end
 
+# Tracer colors with opacity equal to `tracer`, dimmed by the tracer lying between each voxel and
+# the light and by the angle between the tracer gradient and the light
+function lit_voxels(tracer; light_step=(1, -1), extinction=0.12, ambient=0.25)
+    nx, ny, nz = size(tracer)
+    toward_light = (light_step..., 1) ./ hypot(light_step..., 1)
+    shadow = zeros(nx, ny, nz)
+    voxels = Array{RGBAf}(undef, nx, ny, nz)
+
+    for k in nz-1:-1:1, j in 1:ny, i in 1:nx
+        i_light, j_light = clamp(i + light_step[1], 1, nx), clamp(j + light_step[2], 1, ny)
+        shadow[i, j, k] = shadow[i_light, j_light, k+1] + tracer[i_light, j_light, k+1]
+    end
+
+    for k in 1:nz, j in 1:ny, i in 1:nx
+        gradient = (tracer[min(i+1, nx), j, k] - tracer[max(i-1, 1), j, k],
+                    tracer[i, min(j+1, ny), k] - tracer[i, max(j-1, 1), k],
+                    tracer[i, j, min(k+1, nz)] - tracer[i, j, max(k-1, 1)])
+
+        steepness = hypot(gradient...)
+        facing = steepness > 0 ? max(-sum(gradient .* toward_light) / steepness, 0) : 1
+        weight = min(steepness / 0.2, 1)
+        brightness = (1 - weight + weight * (0.45 + 0.55 * facing)) * (ambient + (1 - ambient) * exp(-extinction * shadow[i, j, k]))
+        color = tracer_color(tracer[i, j, k])
+        voxels[i, j, k] = RGBAf(color.r * brightness, color.g * brightness, color.b * brightness, tracer[i, j, k])
+    end
+
+    return voxels
+end
+
 #%%
 tracer_kw = (; colormap=:matter, colorrange=(0, 1))
 tracer_colors = Makie.to_colormap(:matter)
@@ -139,5 +168,16 @@ let
     volume!(ax, x[1] .. x[end], y[1] .. y[end], z[1] .. z[end], voxels; algorithm=:absorptionrgba, absorption=70)
 
     save("./Output/dense_overflow_3d_volume.png", fig, px_per_unit=2)
+end
+
+#%% Volume rendering lit from the east, with self-shadowing
+let
+    fig, ax = overflow_axis()
+    tracer = clamp.(replace(c[1:3:Nx, 1:3:Ny, :], NaN => 0), 0, 1)
+
+    lines!(ax, buoyancy_contours(bottom_height); color=:gray25, linewidth=1.5)
+    volume!(ax, x[1] .. x[end], y[1] .. y[end], z[1] .. z[end], lit_voxels(tracer); algorithm=:absorptionrgba, absorption=70)
+
+    save("./Output/dense_overflow_3d_volume_lit.png", fig, px_per_unit=2)
 end
 #%%
