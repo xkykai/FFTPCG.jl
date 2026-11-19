@@ -32,7 +32,7 @@ surface_vorticity = interior(ζ, :, :, 1) ./ f₀
 
 #%%
 let
-    fig = Figure(size=(510, 330), fontsize=9, figure_padding=(4, 8, 4, 4))
+    fig = Figure(size=(510, 480), fontsize=9, figure_padding=(4, 8, 4, 4))
     letters = 'a':'z'
     panel_title(letter, text) = rich(rich("($letter) "; font=:bold), text)
     axis_kw = (; titlefont=:regular, titlealign=:left, titlegap=2, xlabelpadding=1, ylabelpadding=1,
@@ -45,22 +45,26 @@ let
             for (q, t) in enumerate(tracer_times)]
 
     for (ax, c) in zip(axes, bottom_tracer)
-        heatmap!(ax, x, y, c; colormap=:matter, colorrange=(0, 1), nan_color=:gray75)
+        heatmap!(ax, x, y, c; colormap=:matter, colorrange=(0, 1), nan_color=:gray75, rasterize=5)
     end
 
     Colorbar(fig[1:2, 3]; colorbar_kw..., colormap=:matter, limits=(0, 1), label="Tracer concentration")
 
     axζ = Axis(fig[3, 1:2]; axis_kw..., title=panel_title('e', "Surface vorticity, $(day_label(tracer_times[end]))"))
-    hm = heatmap!(axζ, xF, yF, surface_vorticity; colormap=:balance, colorrange=(-1, 1), nan_color=:gray75)
+    hm = heatmap!(axζ, xF, yF, surface_vorticity; colormap=:balance, colorrange=(-1, 1), nan_color=:gray75, rasterize=5)
     contour!(axζ, x, y, bottom_tracer[end]; levels=[0.1], color=:black, linewidth=0.5)
     Colorbar(fig[3, 3], hm; colorbar_kw..., label=rich("ζ / f", subscript("0")))
 
-    hidexdecorations!.(axes; ticks=false)
+    hidexdecorations!.(axes[1:2]; ticks=false)
+    hidexdecorations!.(axes[3:4]; ticks=false, ticklabels=false)
     hideydecorations!.(axes[[2, 4]]; ticks=false)
 
-    rowsize!(fig.layout, 3, Relative(0.5))
+    rowsize!(fig.layout, 1, Aspect(1, grid.Ly / grid.Lx))
+    rowsize!(fig.layout, 2, Aspect(1, grid.Ly / grid.Lx))
+    rowsize!(fig.layout, 3, Aspect(1, 2 * grid.Ly / grid.Lx))
     rowgap!(fig.layout, 4)
     colgap!(fig.layout, 4)
+    resize_to_layout!(fig)
 
     display(fig)
     save("./Output/dense_overflow_eddies_james.pdf", fig, pt_per_unit=1)

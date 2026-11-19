@@ -23,8 +23,8 @@ Nx, Ny, Nz = size(grid)
 Δx, Δy, Δz = grid.Lx / Nx, grid.Ly / Ny, grid.Lz / Nz
 x = xnodes(grid, Center()) ./ kilometers
 
-b_classes = range(-0.021, 0.006, step=5e-4)
-c_classes = range(-0.4, 1.2, step=0.02)
+b_classes = range(-0.022, 0.008, step=5e-4)
+c_classes = range(-0.6, 1.4, step=0.02)
 
 function accumulate_census!(tracer_area, volume, c, b, b_classes, c_classes)
     for I in CartesianIndices(c)
@@ -66,20 +66,22 @@ let
     colorbar_kw = (; width=5, ticklabelsize=8, labelpadding=2, ticksize=3)
     centers(classes) = (classes[1:end-1] .+ classes[2:end]) ./ 2
     b_ticks = -20:5:0
+    ambient_depths = 600:600:3000
     b_label = rich("Buoyancy (10", superscript("−3"), " m s", superscript("−2"), ")")
     period = "days $(round(Int, averaging_start / day))–$(round(Int, c_series.times[end] / day))"
 
     axT = Axis(fig[1, 1]; axis_kw...,
                title = panel_title('a', "Along-slope transport of fluid with tracer > $plume_threshold"),
-               ylabel = "Transport (Sv)")
+               ylabel = "Transport (Sv)",
+               limits = (nothing, (-50, 3)))
 
     for m in axes(transport, 2)
         lines!(axT, x, transport[:, m] ./ 1e6; color=(:gray50, 0.5), linewidth=0.5)
     end
 
     lines!(axT, x, vec(mean(transport, dims=2)) ./ 1e6; color=:black, linewidth=1.8, label="Mean, $period")
-    hlines!(axT, -Δb₀ * h₀^2 / 2f₀ / 1e6; color=Makie.wong_colors()[6], linewidth=1, linestyle=:dash, label="Inflow")
-    axislegend(axT; position=:lb, framevisible=false, patchsize=(16, 8), rowgap=0, padding=(4, 0, 0, 0))
+    hlines!(axT, -Δb₀ * h₀^2 / 2f₀ / 1e6; color=Makie.wong_colors()[6], linewidth=1, linestyle=:dash, label="Geostrophic inflow")
+    axislegend(axT; position=:cb, orientation=:horizontal, framevisible=false, patchsize=(16, 8), padding=(0, 0, 0, 0))
 
     axxb = Axis(fig[2, 1]; axis_kw...,
                 title = panel_title('c', "Tracer by buoyancy class, $period"),
@@ -94,7 +96,7 @@ let
     hlines!(axxb, [-10, -9]; color=:black, linewidth=0.6, linestyle=:dot)
     text!(axxb, x[1] + 10, -9; text="Legg et al. (2006)", align=(:left, :bottom), fontsize=7)
 
-    plume = centers(c_classes) .> plume_threshold
+    plume = c_classes[1:end-1] .≥ plume_threshold
     axV = Axis(fig[1, 3]; axis_kw...,
                title = panel_title('b', "Plume volume, $period"),
                ylabel = rich("Volume (10", superscript("3"), " km", superscript("3"), ")"),
@@ -106,17 +108,16 @@ let
     axcb = Axis(fig[2, 3]; axis_kw...,
                 title = panel_title('d', "Volume by class"),
                 xlabel = "Tracer concentration",
-                yticks = b_ticks,
+                ylabel = "Depth of ambient water (m)",
+                yticks = (-N² .* ambient_depths .* 1e3, string.(ambient_depths)),
                 limits = ((0, 1), nothing))
 
     hmcb = heatmap!(axcb, centers(c_classes), centers(b_classes) .* 1e3, replace(volume, 0 => NaN) ./ kilometers^3;
                     colormap=:dense, colorscale=log10, colorrange=(1, 1e3))
     Colorbar(fig[2, 4], hmcb; colorbar_kw..., label=rich("Volume per class (km", superscript("3"), ")"))
 
-    for ambient_depth in 600:600:3000
-        ambient_buoyancy = -N² * ambient_depth * 1e3
-        lines!(axcb, [0, 1], [ambient_buoyancy, -Δb₀ * 1e3]; color=:black, linewidth=0.5, linestyle=:dash)
-        text!(axcb, 0.03, ambient_buoyancy; text="$ambient_depth m", align=(:left, :bottom), fontsize=7)
+    for depth in ambient_depths
+        lines!(axcb, [0, 1], [-N² * depth, -Δb₀] .* 1e3; color=:black, linewidth=0.5, linestyle=:dash)
     end
 
     linkxaxes!(axT, axxb)
@@ -125,7 +126,6 @@ let
     ylims!(axxb, -21, 0)
     hidexdecorations!(axT, ticks=false)
     hidexdecorations!(axV, ticks=false)
-    hideydecorations!(axcb, ticks=false)
 
     rowsize!(fig.layout, 1, Relative(0.3))
     colsize!(fig.layout, 3, Relative(0.32))

@@ -26,6 +26,7 @@ x, y = x ./ kilometers, y ./ kilometers
 bottom_k = [something(findfirst(!isnan, view(c, i, j, :)), Nz) for i in 1:Nx, j in 1:Ny]
 bottom(φ) = [φ[i, j, bottom_k[i, j]] for i in 1:Nx, j in 1:Ny]
 i_slice = searchsortedlast(x, x_slice / kilometers)
+y_slice = (-100, 10)
 
 #%%
 let
@@ -43,17 +44,17 @@ let
                  yticks = -200:100:0,
                  limits = (extrema(x), extrema(y)))
 
-    hm = heatmap!(axmap, x, y, bottom(c); tracer_kw...)
+    hm = heatmap!(axmap, x, y, bottom(c); tracer_kw..., rasterize=5)
     contour!(axmap, x, y, bottom(b); levels=-0.018:0.0015:0, color=:black, linewidth=0.3)
-    lines!(axmap, [x[i_slice], x[i_slice]], [-100, 0]; color=:black, linewidth=0.8, linestyle=:dash)
+    lines!(axmap, [x[i_slice], x[i_slice]], [y_slice...]; color=:black, linewidth=0.8, linestyle=:dash)
 
     axslice = Axis(fig[1, 2]; axis_kw...,
-                   title = panel_title('b', "Tracer at x = −$(round(Int, abs(x_slice) / kilometers)) km"),
+                   title = panel_title('b', "Tracer at x = $(replace(string(round(Int, x[i_slice])), "-" => "−")) km"),
                    xlabel = "y (km)",
                    ylabel = "z (m)",
                    xticks = -100:50:0,
                    yticks = -1500:500:0,
-                   limits = (-100, 10, -1700, 0))
+                   limits = (y_slice, (-1700, 0)))
 
     heatmap!(axslice, y, z, c[i_slice, :, :]; tracer_kw...)
     Colorbar(fig[1, 3], hm; label="Tracer concentration", width=5, ticklabelsize=8, labelpadding=2, ticksize=3)
