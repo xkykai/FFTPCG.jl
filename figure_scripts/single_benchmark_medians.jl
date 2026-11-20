@@ -6,7 +6,7 @@ const PRECONDITIONER_LABELS = ["no" => "No preconditioner",
                                "FFT32" => "FFT32 preconditioner",
                                "DiagonallyDominant" => "Diagonally-dominant preconditioner (MITgcm)",
                                "ColumnwiseTridiagonal" => "Columnwise tridiagonal preconditioner (MITgcm)",
-                               "FFT" => "FFT only"]
+                               "FFT" => "FFT only (inexact solution)"]
 
 """
     single_benchmark_medians(file_path, layout)
