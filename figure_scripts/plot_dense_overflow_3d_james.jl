@@ -73,10 +73,17 @@ let
     letters = 'a':'z'
     buoyancy_kw = (; colormap=:haline, colorrange=(-14, 0))
 
+    axis_style = (; labelsize=8, labelcolor=:gray30, ticklabelsize=7, ticklabelcolor=:gray30, ticksize=2, tickwidth=0.4,
+                    tickcolor=:gray50, spinewidth=0.4, spinecolor_1=:gray50, spinecolor_2=:transparent,
+                    spinecolor_3=:transparent, gridvisible=false)
+    axis_kw = (; (Symbol(dimension, name) => value for dimension in "xyz" for (name, value) in pairs(axis_style))...)
+
     for (q, t) in enumerate(snapshot_times)
         plume = plume_surface(findfirst(≈(t), fields.c.times))
+        labelled = q == 3
+        label_kw = (; (Symbol(dimension, name) => labelled for dimension in "xyz" for name in (:labelvisible, :ticklabelsvisible))...)
 
-        ax = Axis3(fig[(q + 1) ÷ 2, 2 - q % 2];
+        ax = Axis3(fig[(q + 1) ÷ 2, 2 - q % 2]; axis_kw..., label_kw...,
                    title = rich(rich("($(letters[q])) "; font=:bold), "t = $(round(Int, t / day)) days"),
                    titlefont = :regular,
                    titlealign = :left,
@@ -85,32 +92,17 @@ let
                    ylabel = "y (km)",
                    zlabel = "z (km)",
                    xticks = -500:250:0,
-                   yticks = -200:100:0,
-                   zticks = -3:1:0,
+                   yticks = -200:200:0,
+                   zticks = -3:3:0,
                    aspect = (1, grid.Ly / grid.Lx, 0.18),
                    limits = (extrema(x), extrema(y), (-3.3, 0)),
                    azimuth = -0.6π,
                    elevation = 0.14π,
                    perspectiveness = 0.3,
                    protrusions = (30, 4, 16, 10),
-                   xlabeloffset = 20,
-                   ylabeloffset = 30,
-                   zlabeloffset = 24,
-                   xticklabelsize = 8,
-                   yticklabelsize = 8,
-                   zticklabelsize = 8,
-                   xticksize = 3,
-                   yticksize = 3,
-                   zticksize = 3,
-                   xtickwidth = 0.5,
-                   ytickwidth = 0.5,
-                   ztickwidth = 0.5,
-                   xspinewidth = 0.5,
-                   yspinewidth = 0.5,
-                   zspinewidth = 0.5,
-                   xgridvisible = false,
-                   ygridvisible = false,
-                   zgridvisible = false)
+                   xlabeloffset = 16,
+                   ylabeloffset = 24,
+                   zlabeloffset = 18)
 
         surface!(ax, x, y, bottom_height; color=zeros(Nx, Ny), colormap=[:gray78, :gray78], rasterize=5)
         surface!(ax, x, y, plume.height; color=plume.buoyancy .* 1e3, buoyancy_kw..., rasterize=5)
