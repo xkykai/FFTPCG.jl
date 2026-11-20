@@ -162,7 +162,7 @@ for (n, letter, position) in ((1, 'a', small[1, 1]), (4, 'b', small[1, 2]), (8, 
     title = "($letter) $n GPU$(n > 1 ? "s" : ""), " * (n == 1 ? "448³" : "$(448n) × 448²")
     ax = scaled_axis3(position, title, n + (n - 1) * gap, 1, 1, scale)
     ax.halign = :center
-    domain!(ax, n, n, 1; gap)
+    domain!(ax, n, n, 1; gap, Δ = 1 / 448)
 end
 colgap!(small, 30)
 buoyancy_colorbar(fig[1:2, 2]; width = 6, height = Relative(0.7))
@@ -178,7 +178,7 @@ scale = 105
 
 for (col, (n, gap, letter)) in enumerate(zip((1, 4, 8), (0, 0.06, 0.04), "abc"))
     title = "($letter) $n GPU$(n > 1 ? "s" : ""), " * (n == 1 ? "448³" : "$(448 ÷ n) × 448² each")
-    domain!(scaled_axis3(fig[1, col], title, 1 + (n - 1) * gap, 1, 1, scale), n, 1, 1; gap)
+    domain!(scaled_axis3(fig[1, col], title, 1 + (n - 1) * gap, 1, 1, scale), n, 1, 1; gap, Δ = 1 / 448)
 end
 buoyancy_colorbar(fig[1, 4]; width = 6, height = Relative(0.8))
 resize_to_layout!(fig)
@@ -192,24 +192,26 @@ scale = 110
 Δ = 1 / 600
 
 squares = GridLayout(fig[1, 1])
-Label(squares[0, 1:3], "Squares, (Nx, Ny, Nz) = (N, N, 600)"; font = :bold, tellwidth = false)
+Label(squares[0, 1:3], "Squares, (Nx, Ny, Nz) = (N, N, 600)"; font = :bold, fontsize = 11, tellwidth = false)
 for (col, (N, letter)) in enumerate(zip((128, 256, 512), "abc"))
     ax = scaled_axis3(squares[1, col], "($letter) N = $N", N * Δ, N * Δ, 1, scale; azimuth = 1.3π, elevation = 0.2π)
+    ax.titlefont = :regular
     domain!(ax, 1, N * Δ, N * Δ; gap = 0, Δ)
 end
 colgap!(squares, 24)
-rowgap!(squares, 2)
+rowgap!(squares, 8)
 
 strips = GridLayout(fig[2, 1])
-Label(strips[0, 1:2], "Strips, (Nx, Ny, Nz) = (Nx, 32, 600)"; font = :bold, tellwidth = false)
+Label(strips[0, 1:2], "Strips, (Nx, Ny, Nz) = (Nx, 32, 600)"; font = :bold, fontsize = 11, tellwidth = false)
 for (col, (Nx, letter)) in enumerate(zip((512, 2048), "de"))
     ax = scaled_axis3(strips[1, col], "($letter) (Nx, Ny) = ($Nx, 32)", Nx * Δ, 32Δ, 1, scale; elevation = 0.2π)
+    ax.titlefont = :regular
     domain!(ax, 1, Nx * Δ, 32Δ; gap = 0, Δ)
 end
 colgap!(strips, 24)
-rowgap!(strips, 2)
+rowgap!(strips, 8)
 buoyancy_colorbar(fig[1:2, 2]; width = 6, height = Relative(0.6))
-rowgap!(fig.layout, 12)
+rowgap!(fig.layout, 24)
 resize_to_layout!(fig)
 
 save("./Output/single_H100_setup.pdf", fig, pt_per_unit = 1)
@@ -219,7 +221,7 @@ save("./Output/single_H100_setup.png", fig, px_per_unit = 6)
 fig = Figure(fontsize = 9, figure_padding = (4, 8, 4, 4))
 
 gap = 6
-ax = scaled_axis3(fig[1, 1], "(a) Bottom and top walls, top seen through", 32, 32, 16 + gap, 3.4;
+ax = scaled_axis3(fig[1, 1], "(a) Bottom and top walls", 32, 32, 16 + gap, 3.4;
                   azimuth = 1.32π, elevation = 0.12π)
 walls!(ax; gap)
 cells!(fig[1, 2], "(b) x–z cross-section through the apexes")
@@ -234,7 +236,7 @@ for (grid, (shape, Nz, color, side)) in zip(GRID_TYPES, (("N × N × N", 600, 1,
     z = grid == "stretched" ? stretched_z_faces(Nz, 1) : range(0, 1, length = Nz + 1)
     ratio = diff(z) .* N
     lines!(spacing, ratio, (z[1:end-1] .+ z[2:end]) ./ 2; color = Makie.wong_colors()[color])
-    text!(spacing, maximum(ratio), 0.5; text = "$grid, $shape", rotation = π / 2, offset = (2side, 0),
+    text!(spacing, maximum(ratio), 0.5; text = "$grid, $shape", rotation = π / 2, offset = (4side, 0), fontsize = 7.5,
           align = (:center, side < 0 ? :bottom : :top), color = Makie.wong_colors()[color])
 end
 limits!(spacing, 0.07, 1.6, 0, 1)
