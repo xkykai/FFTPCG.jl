@@ -240,7 +240,7 @@ for (grid, (shape, Nz, color, side)) in zip(GRID_TYPES, (("N × N × N", 600, 1,
           align = (:center, side < 0 ? :bottom : :top), color = Makie.wong_colors()[color])
 end
 limits!(spacing, 0.07, 1.6, 0, 1)
-Label(fig[2, 3], "Δx = Δy = 1/N, with N = 448 per A100\nand N = 600 on one H100"; fontsize = 8, tellwidth = false, halign = :left, justification = :left)
+Label(fig[2, 3], "Δx = Δy = 1/N\nN = 448 on A100 and 600 on H100"; fontsize = 8, tellwidth = false, halign = :left, justification = :left)
 colgap!(fig.layout, 30)
 rowgap!(fig.layout, 4)
 resize_to_layout!(fig)
