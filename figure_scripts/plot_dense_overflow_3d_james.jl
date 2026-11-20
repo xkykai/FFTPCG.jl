@@ -68,54 +68,52 @@ function buoyancy_contours(buoyancy, height)
 end
 
 #%%
-let
-    fig = Figure(size=(510, 250), fontsize=9, figure_padding=(4, 8, 4, 4))
-    letters = 'a':'z'
-    buoyancy_kw = (; colormap=:haline, colorrange=(-14, 0))
+fig = Figure(size=(510, 250), fontsize=9, figure_padding=(4, 8, 4, 4))
+letters = 'a':'z'
+buoyancy_kw = (; colormap=:haline, colorrange=(-14, 0))
 
-    axis_style = (; labelsize=8, labelcolor=:gray30, ticklabelsize=7, ticklabelcolor=:gray30, ticksize=2, tickwidth=0.4,
-                    tickcolor=:gray50, spinewidth=0.4, spinecolor_1=:gray50, spinecolor_2=:transparent,
-                    spinecolor_3=:transparent, gridvisible=false)
-    axis_kw = (; (Symbol(dimension, name) => value for dimension in "xyz" for (name, value) in pairs(axis_style))...)
+axis_style = (; labelsize=8, labelcolor=:gray30, ticklabelsize=7, ticklabelcolor=:gray30, ticksize=2, tickwidth=0.4,
+                tickcolor=:gray50, spinewidth=0.4, spinecolor_1=:gray50, spinecolor_2=:transparent,
+                spinecolor_3=:transparent, gridvisible=false)
+axis_kw = (; (Symbol(dimension, name) => value for dimension in "xyz" for (name, value) in pairs(axis_style))...)
 
-    for (q, t) in enumerate(snapshot_times)
-        plume = plume_surface(findfirst(≈(t), fields.c.times))
+for (q, t) in enumerate(snapshot_times)
+    plume = plume_surface(findfirst(≈(t), fields.c.times))
 
-        ax = Axis3(fig[(q + 1) ÷ 2, 2 - q % 2]; axis_kw...,
-                   title = rich(rich("($(letters[q])) "; font=:bold), "t = $(round(Int, t / day)) days"),
-                   titlefont = :regular,
-                   titlealign = :left,
-                   titlegap = 2,
-                   xlabel = "x (km)",
-                   ylabel = "y (km)",
-                   zlabel = "z (km)",
-                   xticks = -500:250:0,
-                   yticks = -200:100:0,
-                   zticks = -3:1:0,
-                   aspect = (1, grid.Ly / grid.Lx, 0.18),
-                   limits = (extrema(x), extrema(y), (-3.3, 0)),
-                   azimuth = -0.6π,
-                   elevation = 0.14π,
-                   perspectiveness = 0.3,
-                   protrusions = (30, 4, 16, 10),
-                   xlabeloffset = 20,
-                   ylabeloffset = 30,
-                   zlabeloffset = 24)
+    ax = Axis3(fig[(q + 1) ÷ 2, 2 - q % 2]; axis_kw...,
+               title = rich(rich("($(letters[q])) "; font=:bold), "t = $(round(Int, t / day)) days"),
+               titlefont = :regular,
+               titlealign = :left,
+               titlegap = 2,
+               xlabel = "x (km)",
+               ylabel = "y (km)",
+               zlabel = "z (km)",
+               xticks = -500:250:0,
+               yticks = -200:100:0,
+               zticks = -3:1:0,
+               aspect = (1, grid.Ly / grid.Lx, 0.18),
+               limits = (extrema(x), extrema(y), (-3.3, 0)),
+               azimuth = -0.6π,
+               elevation = 0.14π,
+               perspectiveness = 0.3,
+               protrusions = (30, 4, 16, 10),
+               xlabeloffset = 20,
+               ylabeloffset = 30,
+               zlabeloffset = 24)
 
-        surface!(ax, x, y, bottom_height; color=zeros(Nx, Ny), colormap=[:gray78, :gray78], rasterize=5)
-        surface!(ax, x, y, plume.height; color=plume.buoyancy .* 1e3, buoyancy_kw..., rasterize=5)
-        lines!(ax, buoyancy_contours(plume.buoyancy, plume.height); color=:black, linewidth=0.4)
-        lines!(ax, buoyancy_contours(plume.slope_buoyancy, bottom_height); color=:black, linewidth=0.4)
-    end
-
-    Colorbar(fig[1:2, 3]; buoyancy_kw..., width=5, ticklabelsize=8, labelpadding=2, ticksize=3, height=Relative(0.6),
-             label=rich("Buoyancy (10", superscript("−3"), " m s", superscript("−2"), ")"))
-
-    rowgap!(fig.layout, 2)
-    colgap!(fig.layout, 4)
-
-    display(fig)
-    save("./Output/dense_overflow_3d_james.pdf", fig, pt_per_unit=1)
-    save("./Output/dense_overflow_3d_james.png", fig, px_per_unit=6)
+    surface!(ax, x, y, bottom_height; color=zeros(Nx, Ny), colormap=[:gray78, :gray78], rasterize=5)
+    surface!(ax, x, y, plume.height; color=plume.buoyancy .* 1e3, buoyancy_kw..., rasterize=5)
+    lines!(ax, buoyancy_contours(plume.buoyancy, plume.height); color=:black, linewidth=0.4)
+    lines!(ax, buoyancy_contours(plume.slope_buoyancy, bottom_height); color=:black, linewidth=0.4)
 end
+
+Colorbar(fig[1:2, 3]; buoyancy_kw..., width=5, ticklabelsize=8, labelpadding=2, ticksize=3, height=Relative(0.6),
+         label=rich("Buoyancy (10", superscript("−3"), " m s", superscript("−2"), ")"))
+
+rowgap!(fig.layout, 2)
+colgap!(fig.layout, 4)
+
+display(fig)
+save("./Output/dense_overflow_3d_james.pdf", fig, pt_per_unit=1)
+save("./Output/dense_overflow_3d_james.png", fig, px_per_unit=6)
 #%%
