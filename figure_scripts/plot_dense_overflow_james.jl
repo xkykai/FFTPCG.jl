@@ -5,7 +5,7 @@ using CairoMakie
 
 #%%
 filename = "dense_overflow_Nx_1536_Ny_640_Nz_128_CG_nu4h_5.0e6_nu4z_80.0_14days"
-snapshot_time = 13days
+snapshot_time = 14days
 x_slice = -50kilometers
 
 fields = NamedTuple(Symbol(name) => FieldTimeSeries("./Data/$filename/instantaneous_fields.jld2", name; backend=OnDisk())
@@ -29,11 +29,11 @@ i_slice = searchsortedlast(x, x_slice / kilometers)
 y_slice = (-100, 10)
 
 #%%
-for (colormap, name) in ((:matter, "dense_overflow_james"), (:jet, "dense_overflow_jet_james"))
+let
     fig = Figure(size=(510, 158), fontsize=9, figure_padding=(4, 8, 4, 4))
     panel_title(letter, text) = rich(rich("($letter) "; font=:bold), text)
     axis_kw = (; titlefont=:regular, titlealign=:left, titlegap=2, xlabelpadding=1, ylabelpadding=1)
-    tracer_kw = (; colormap, colorrange=(0, 1), nan_color=:gray75)
+    tracer_kw = (; colormap=:matter, colorrange=(0, 1), nan_color=:gray75)
     days = round(Int, snapshot_time / day)
 
     axmap = Axis(fig[1, 1]; axis_kw...,
@@ -64,7 +64,7 @@ for (colormap, name) in ((:matter, "dense_overflow_james"), (:jet, "dense_overfl
     colgap!(fig.layout, 2, 4)
 
     display(fig)
-    save("./Output/$name.pdf", fig, pt_per_unit=1)
-    save("./Output/$name.png", fig, px_per_unit=6)
+    save("./Output/dense_overflow_james.pdf", fig, pt_per_unit=1)
+    save("./Output/dense_overflow_james.png", fig, px_per_unit=6)
 end
 #%%
