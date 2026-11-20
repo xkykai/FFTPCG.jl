@@ -5,7 +5,7 @@ using CairoMakie
 
 #%%
 filename = "dense_overflow_Nx_1536_Ny_640_Nz_128_CG_nu4h_5.0e6_nu4z_80.0_14days"
-snapshot_times = [2days, 6days, 10days, 13days]
+snapshot_times = [2days, 6days, 10days, 14days]
 plume_threshold = 0.05
 buoyancy_levels = -0.018:0.0015:0
 hₑ = 600    # embayment depth (m)
