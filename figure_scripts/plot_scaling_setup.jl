@@ -3,218 +3,209 @@ using Makie
 
 include("../benchmarks/rough_rayleigh_benard_setup.jl")
 
-# Lengths are in units of the domain height; Δ is the grid spacing, 1/448 on A100 and 1/600 on H100.
-triangle(η, Δ) = 8Δ - abs(mod(η, 16Δ) - 8Δ)
-pyramid(x, y, Δ) = min(triangle(x, Δ), triangle(y, Δ))
+# Lengths are in units of the domain height.
+triangle(η) = 8 - abs(mod(η, 16) - 8) # pyramid height in grid spacings, 16 spacings wide
+pyramid(i, j) = min(triangle(i), triangle(j))
 buoyancy(x, z, Lx) = -z + 1/2 + tanh((x - Lx / 2) / (Lx / 20)) / 4
-
-# x-z slices pass through a row of pyramid apexes
-solid(x, z, Δ) = (z <= pyramid(x, 7.5Δ, Δ)) | (z >= 1 - pyramid(x, 7.5Δ, Δ))
 
 colormap = :balance
 levels = -0.75:0.125:0.75
-azimuth = 1.43π
-elevation = 0.25π
-front_offset = 0.9 # distance the front faces are pulled forward, in units of the domain height drawn
+azimuth = 1.45π
+elevation = 0.12π
+gray(name) = RGBf(Makie.to_color(name))
 
-"Square pyramids on `[0, Lx] × [0, Ly]` at `o`, their faces shaded by the way they face."
-function pyramids!(ax, o, Lx, Ly, Δ)
-    h = 8Δ
-    points = Point3f[]
-    colors = RGBf[]
-    shades = RGBf.(Makie.to_color.([:gray70, :gray50, :gray40, :gray88])) # -y, +x, +y and -x faces
-    for a in 0:2h:Lx-h, c in 0:2h:Ly-h
-        apex = o + Point3f(a + h, c + h, h)
-        corners = [o + Point3f(p) for p in ((a, c, 0), (a + 2h, c, 0), (a + 2h, c + 2h, 0), (a, c + 2h, 0))]
-        for k in 1:4
-            append!(points, (corners[k], corners[mod1(k + 1, 4)], apex))
-            append!(colors, fill(shades[k], 3))
-        end
-    end
-    mesh!(ax, points, reshape(1:length(points), 3, :)'; color = colors, shading = NoShading, rasterize = 5)
-    return nothing
+"Width and height of the box `Lx × Ly × Lz` on screen, seen from `azimuth` and `elevation` without perspective."
+function projected_size(Lx, Ly, Lz; azimuth = azimuth, elevation = elevation)
+    width = abs(sin(azimuth)) * Lx + abs(cos(azimuth)) * Ly
+    height = cos(elevation) * Lz + abs(sin(elevation)) * (abs(cos(azimuth)) * Lx + abs(sin(azimuth)) * Ly)
+    return width, height
 end
 
-"Edges of the box `[0, Lx] × [0, Ly] × [0, Lz]` at `o`."
-function edges!(ax, o, Lx, Ly, Lz)
-    corners = [(0, 0), (Lx, 0), (Lx, Ly), (0, Ly)]
-    for (x, y) in corners
-        lines!(ax, [o + Point3f(x, y, 0), o + Point3f(x, y, Lz)]; color = :black, linewidth = 0.5)
-    end
-    for z in (0, Lz)
-        lines!(ax, [o + Point3f(x, y, z) for (x, y) in [corners; corners[1:1]]]; color = :black, linewidth = 0.5)
-    end
-    return nothing
-end
-
-"""
-    front!(ax, o, x₀, x₁, Lx, Lz, Δ; y)
-
-Filled contours of the initial buoyancy on an x-z slice through `[x₀, x₁] × [0, Lz]` of a domain of length `Lx`,
-drawn at `o` on the plane `y`, with the immersed walls in grey.
-"""
-function front!(ax, o, x₀, x₁, Lx, Lz, Δ; y)
-    x = range(x₀ + Δ / 2, x₁ - Δ / 2, step = Δ)
-    z = range(Δ / 2, Lz - Δ / 2, step = Δ)
-    b = [solid(x, z, Δ) ? NaN : buoyancy(x, z, Lx) for x in x, z in z]
-    walls = [solid(x, z, Δ) ? 1.0 : NaN for x in x, z in z]
-    X = x .- x₀ .+ o[1]
-    Z = z .+ o[3]
-    transformation = (:xz, o[2] + y)
-    contourf!(ax, X, Z, b; colormap, levels, transformation, rasterize = 5)
-    heatmap!(ax, X, Z, walls; colormap = [:gray40, :gray40], transformation, rasterize = 5)
-    edges!(ax, Point3f(o[1], o[2] + y, o[3]), x₁ - x₀, 0, Lz)
-    return nothing
-end
-
-"""
-    domain!(ax, o, ngpus, Lx, Ly, Δ; gap, Lz = 1)
-
-A domain `[0, Lx] × [0, Ly] × [0, Lz]` at `o` split into `ngpus` blocks along x, each pulled `gap` apart, with the
-front face of each block pulled forward to show the buoyancy front. Returns the length drawn along x.
-"""
-function domain!(ax, o, ngpus, Lx, Ly, Δ; gap, Lz = 1)
-    w = Lx / ngpus
-    corner(r) = o + Point3f((r - 1) * (w + gap), 0, 0)
-
-    # Far to near for a camera on the -x, -y side
-    for r in ngpus:-1:1
-        pyramids!(ax, corner(r), w, Ly, Δ)
-        edges!(ax, corner(r), w, Ly, Lz)
-    end
-    for r in ngpus:-1:1
-        front!(ax, corner(r), (r - 1) * w, r * w, Lx, Lz, Δ; y = -front_offset * Lz)
-    end
-    return Lx + (ngpus - 1) * gap
-end
-
-function axis3(position; kw...)
-    ax = Axis3(position; azimuth, elevation, perspectiveness = 0.2, aspect = :data, viewmode = :fitzoom,
-               protrusions = (0, 0, 0, 12), titlesize = 9, titlegap = 0, kw...)
+"An `Axis3` showing `[0, Lx] × [0, Ly] × [0, Lz]` at `scale` points per unit length."
+function scaled_axis3(position, title, Lx, Ly, Lz, scale; azimuth = azimuth, elevation = elevation)
+    width, height = projected_size(Lx, Ly, Lz; azimuth, elevation) .* scale
+    ax = Axis3(position; title, width, height, azimuth, elevation, perspectiveness = 0, aspect = :data,
+               viewmode = :fitzoom, protrusions = (0, 0, 0, 12), titlesize = 9, titlealign = :left, titlegap = 2,
+               halign = :left)
     hidedecorations!(ax)
     hidespines!(ax)
+    limits!(ax, 0, Lx, 0, Ly, 0, Lz)
     return ax
 end
 
-label!(ax, p, text; align = (:left, :top)) = text!(ax, p; text, align, fontsize = 8, clip_planes = Plane3f[])
+"""
+    block!(ax, x₀, x₁, Lx, Ly; shift)
 
-"The immersed bottom wall under 2 × 2 pyramids as columns of solid cells, in units of grid spacings."
-function stepped_pyramids!(ax)
-    n = 32
-    H = [count(k -> k - 0.5 <= pyramid(i - 0.5, j - 0.5, 1), 1:8) for i in 1:n, j in 1:n]
-    shades = RGBf.(Makie.to_color.([:gray88, :gray70, :gray80])) # top, -y and -x faces
-    faces = [1 2 3; 1 3 4]
-
-    # Back to front for a camera on the -x, -y side
-    for (i, j) in sort(vec(collect(Iterators.product(1:n, 1:n))), by = ((i, j),) -> cos(azimuth) * i + sin(azimuth) * j)
-        z = H[i, j]
-        x₀, x₁, y₀, y₁ = i - 1, i, j - 1, j
-        top = Point3f.([(x₀, y₀, z), (x₁, y₀, z), (x₁, y₁, z), (x₀, y₁, z)])
-        front = Point3f.([(x₀, y₀, 0), (x₁, y₀, 0), (x₁, y₀, z), (x₀, y₀, z)])
-        side = Point3f.([(x₀, y₀, 0), (x₀, y₁, 0), (x₀, y₁, z), (x₀, y₀, z)])
-        for (quad, shade) in zip((top, front, side), shades)
-            mesh!(ax, quad, faces; color = shade, shading = NoShading)
-        end
+One GPU's block `[x₀, x₁] × [0, Ly] × [0, 1]` of a domain of length `Lx`, drawn `shift` further along x, with filled
+contours of the initial buoyancy on its front face and on its face at `x₀`.
+"""
+function block!(ax, x₀, x₁, Lx, Ly; shift)
+    x = range(x₀, x₁, length = max(2, round(Int, 300 * (x₁ - x₀))))
+    z = range(0, 1, length = 300)
+    X = x .+ shift
+    contourf!(ax, X, z, buoyancy.(x, z', Lx); colormap, levels, transformation = (:xz, 0))
+    contourf!(ax, [0, Ly], z, repeat(buoyancy.(x₀, z', Lx), 2); colormap, levels, transformation = (:yz, x₀ + shift))
+    X₀, X₁ = x₀ + shift, x₁ + shift
+    mesh!(ax, Point3f[(X₀, 0, 1), (X₁, 0, 1), (X₁, Ly, 1), (X₀, Ly, 1)], [1 2 3; 1 3 4]; color = :gray85,
+          shading = NoShading)
+    for face in ([(X₀, 0, 0), (X₁, 0, 0), (X₁, 0, 1), (X₀, 0, 1)],
+                 [(X₀, 0, 0), (X₀, Ly, 0), (X₀, Ly, 1), (X₀, 0, 1)],
+                 [(X₀, 0, 1), (X₁, 0, 1), (X₁, Ly, 1), (X₀, Ly, 1)])
+        lines!(ax, Point3f[face; face[1:1]]; color = :black, linewidth = 0.5)
     end
-    limits!(ax, 0, n, 0, n, 0, 8)
     return nothing
 end
 
-"Grid cells on the bottom wall at the slice: each pyramid is 16 cells wide and 8 tall."
-function cells!(ax)
+"A domain `[0, Lx] × [0, Ly] × [0, 1]` split into `ngpus` blocks along x, each pulled `gap` apart."
+function domain!(ax, ngpus, Lx, Ly; gap)
+    w = Lx / ngpus
+    for r in ngpus:-1:1 # far to near for a camera on the -x, -y side
+        block!(ax, (r - 1) * w, r * w, Lx, Ly; shift = (r - 1) * gap)
+    end
+    return nothing
+end
+
+"""
+    walls!(ax; gap)
+
+Solid cells of the bottom and top walls under 2 × 2 pyramids, `gap` grid spacings apart, in grid spacings.
+"""
+function walls!(ax; gap)
+    n = 32
+    H = [count(k -> k - 0.5 <= pyramid(i - 0.5, j - 0.5), 1:8) for i in 1:n, j in 1:n]
+    height(i, j) = 1 <= i <= n && 1 <= j <= n ? H[i, j] : 0
+    top = 16 + gap
+    faces = [1 2 3; 1 3 4]
+    quad!(points, shade) = mesh!(ax, Point3f.(points), faces; color = gray(shade), shading = NoShading)
+
+    # Back to front, drawing only the faces in contact with the fluid
+    a = ax.azimuth[]
+    order = sort(vec(collect(Iterators.product(1:n, 1:n))), by = ((i, j),) -> cos(a) * i + sin(a) * j)
+    for flip in (false, true), (i, j) in order
+        x₀, x₁, y₀, y₁ = i - 1, i, j - 1, j
+        z(h) = flip ? top - h : h
+        h, hy, hx = H[i, j], height(i, j - 1), height(i - 1, j)
+        flip || quad!([(x₀, y₀, h), (x₁, y₀, h), (x₁, y₁, h), (x₀, y₁, h)], :gray88)
+        hy < h && quad!([(x₀, y₀, z(hy)), (x₁, y₀, z(hy)), (x₁, y₀, z(h)), (x₀, y₀, z(h))], :gray55)
+        hx < h && quad!([(x₀, y₀, z(hx)), (x₀, y₁, z(hx)), (x₀, y₁, z(h)), (x₀, y₀, z(h))], :gray72)
+    end
+    quad!([(0, 0, top), (n, 0, top), (n, n, top), (0, n, top)], :gray88)
+    return nothing
+end
+
+"Solid cells through a row of pyramid apexes next to the top and bottom walls, stacked at `position`."
+function cells!(position, title)
+    layout = GridLayout(position)
     i = 0:31
     k = 0:9
-    cells = [k + 0.5 <= pyramid(i + 0.5, 7.5, 1) ? 1.0 : NaN for i in i, k in k]
-    heatmap!(ax, i .+ 0.5, k .+ 0.5, cells; colormap = [:gray55, :gray55])
-    vlines!(ax, 0:32; color = :gray80, linewidth = 0.3)
-    hlines!(ax, 0:10; color = :gray80, linewidth = 0.3)
-    lines!(ax, 0:32, [pyramid(i, 7.5, 1) for i in 0:32]; color = :black, linewidth = 0.6)
-    limits!(ax, 0, 32, 0, 10)
+    top, bottom = map(1:2) do row
+        ax = Axis(layout[row, 1]; aspect = DataAspect(), xticks = 0:8:32, xgridvisible = false, ygridvisible = false,
+                  title = row == 1 ? title : "", titlesize = 9, titlealign = :left, titlegap = 2, width = 150)
+        vlines!(ax, 0:32; color = :gray85, linewidth = 0.3)
+        hlines!(ax, -10:10; color = :gray85, linewidth = 0.3)
+        ax
+    end
+    solid = [k + 0.5 <= pyramid(i + 0.5, 7.5) ? 1.0 : NaN for i in i, k in k]
+    heatmap!(top, i .+ 0.5, -k .- 0.5, solid; colormap = [:gray55, :gray55])
+    heatmap!(bottom, i .+ 0.5, k .+ 0.5, solid; colormap = [:gray55, :gray55])
+    lines!(top, 0:32, [-pyramid(i, 7.5) for i in 0:32]; color = :black, linewidth = 0.6)
+    lines!(bottom, 0:32, [pyramid(i, 7.5) for i in 0:32]; color = :black, linewidth = 0.6)
+    limits!(top, 0, 32, -10, 0)
+    limits!(bottom, 0, 32, 0, 10)
+    top.yticks = ([-8, 0], ["Nz − 8", "Nz"])
+    bottom.yticks = [0, 8]
+    top.ylabel = bottom.ylabel = "z / Δz"
+    hidexdecorations!(top; ticks = false)
+    bottom.xlabel = "x / Δx"
+    rowgap!(layout, 4)
     return nothing
 end
 
-function pyramid_panels!(position, letters)
+"The immersed walls in 3D and the solid cells through the pyramid apexes, with panels lettered from `letters`."
+function wall_panels!(position, letters)
     layout = GridLayout(position)
-    stepped_pyramids!(axis3(layout[1, 1]; title = "($(letters[1])) Immersed bottom wall", elevation = 0.15π))
-    ax = Axis(layout[1, 2]; aspect = DataAspect(), xlabel = "x / Δx", ylabel = "z / Δz", xticks = 0:8:32, yticks = 0:4:8,
-              title = "($(letters[2])) Solid cells through the apexes", titlesize = 9, titlegap = 2)
-    cells!(ax)
-    colsize!(layout, 1, Auto(1.4))
-    return nothing
+    gap = 6
+    ax = scaled_axis3(layout[1, 1], "($(letters[1])) Bottom and top walls, 2 × 2 pyramids", 32, 32, 16 + gap, 3.4;
+                      azimuth = 1.32π, elevation = 0.1π)
+    walls!(ax; gap)
+    cells!(layout[1, 2], "($(letters[2])) Solid cells through the apexes")
+    colgap!(layout, 20)
+    return layout
 end
 
 buoyancy_colorbar(position; kw...) = Colorbar(position; colormap = cgrad(colormap, length(levels) - 1, categorical = true),
                                               limits = extrema(levels), label = "Initial buoyancy b", ticks = -0.5:0.5:0.5,
-                                              width = 6, kw...)
+                                              kw...)
 
 #%% Weak scaling on A100: one 448³ block per GPU stacked in x
-fig = Figure(size = (510, 420), fontsize = 9, figure_padding = (2, 8, 2, 4))
+fig = Figure(fontsize = 9, figure_padding = (4, 8, 4, 4))
+scale = 48
+gap = 0.15
 
-ax = axis3(fig[1, 1]; title = "(a) Weak scaling, 448³ points per GPU")
-for (row, n) in enumerate((1, 4, 8))
-    o = Point3f(0, 0, -3.2 * (row - 1))
-    domain!(ax, o, n, n, 1, 1 / 448; gap = 0.3)
-    label!(ax, o + Point3f(-0.3, -front_offset, 0.5), n == 1 ? "1 GPU" : "$n GPUs"; align = (:right, :center))
+small = GridLayout(fig[1, 1]; halign = :left)
+for (n, letter, position) in ((1, 'a', small[1, 1]), (4, 'b', small[1, 2]), (8, 'c', fig[2, 1]))
+    title = "($letter) $n GPU$(n > 1 ? "s" : "")"
+    domain!(scaled_axis3(position, title, n + (n - 1) * gap, 1, 1, scale), n, n, 1; gap)
 end
-limits!(ax, -1.5, 8 + 7 * 0.3, -front_offset, 1, -6.4, 1)
-buoyancy_colorbar(fig[2, 1]; vertical = false, flipaxis = false, width = Relative(0.4), height = 6)
-pyramid_panels!(fig[3, 1], "bc")
-rowsize!(fig.layout, 3, Relative(0.25))
+colgap!(small, 16)
+buoyancy_colorbar(fig[1:2, 2]; width = 6, height = Relative(0.7))
+wall_panels!(fig[3, 1:2], "de")
+Label(fig[0, :], "Weak scaling: 448³ points per GPU, Lx = number of GPUs", font = :bold, fontsize = 9, halign = :left)
+rowgap!(fig.layout, 8)
+resize_to_layout!(fig)
 
 save("./Output/weakscaling_setup.pdf", fig, pt_per_unit = 1)
 save("./Output/weakscaling_setup.png", fig, px_per_unit = 6)
 
 #%% Strong scaling on A100: the 448³ block split in x
-fig = Figure(size = (510, 320), fontsize = 9, figure_padding = (2, 8, 2, 4))
+fig = Figure(fontsize = 9, figure_padding = (4, 8, 4, 4))
+scale = 105
 
-ax = axis3(fig[1, 1]; title = "(a) Strong scaling, 448³ points in total")
-x = 0.0
-for n in (1, 4, 8)
-    o = Point3f(x, 0, 0)
-    global x += domain!(ax, o, n, 1, 1, 1 / 448; gap = 0.08) + 0.6
-    label!(ax, o + Point3f(0, -front_offset, -0.05), n == 1 ? "1 GPU" : "$n GPUs, $(448 ÷ n) × 448² each")
+for (col, (n, gap, letter)) in enumerate(zip((1, 4, 8), (0, 0.06, 0.04), "abc"))
+    title = "($letter) $n GPU$(n > 1 ? "s" : "")" * (n > 1 ? ", $(448 ÷ n) × 448² each" : "")
+    domain!(scaled_axis3(fig[1, col], title, 1 + (n - 1) * gap, 1, 1, scale), n, 1, 1; gap)
 end
-limits!(ax, 0, x - 0.6, -front_offset, 1, -0.6, 1)
-buoyancy_colorbar(fig[2, 1]; vertical = false, flipaxis = false, width = Relative(0.4), height = 6)
-pyramid_panels!(fig[3, 1], "bc")
-rowsize!(fig.layout, 3, Relative(0.35))
+buoyancy_colorbar(fig[1, 4]; width = 6, height = Relative(0.8))
+wall_panels!(fig[2, 1:4], "de")
+Label(fig[0, :], "Strong scaling: 448³ points in total", font = :bold, fontsize = 9, halign = :left)
+rowgap!(fig.layout, 8)
+resize_to_layout!(fig)
 
 save("./Output/strongscaling_setup.pdf", fig, pt_per_unit = 1)
 save("./Output/strongscaling_setup.png", fig, px_per_unit = 6)
 
-#%% One H100: squares Nx × Nx × 600 and strips Nx × 32 × 600 at the same grid spacing, bottom 48 points in z
-fig = Figure(size = (510, 260), fontsize = 9, figure_padding = (2, 8, 2, 4))
+#%% One H100: squares Nx × Nx × 600 and strips Nx × 32 × 600, all with Δx = Δy = Δz = 1/600
+fig = Figure(fontsize = 9, figure_padding = (4, 8, 4, 4))
+scale = 100
 
-Δ = 1 / 600
-Lz = 48Δ
-ax = axis3(fig[1, 1]; title = "(a) Bottom 48 of 600 points in z, Δx = Δy = 1/600")
-x = 0.0
-for Nx in (32, 64, 128)
-    o = Point3f(x, 0, 0.3)
-    global x += domain!(ax, o, 1, Nx * Δ, Nx * Δ, Δ; gap = 0, Lz) + 40Δ
-    label!(ax, o + Point3f(0, Nx * Δ, Lz), "$Nx × $Nx"; align = (:left, :bottom))
+squares = GridLayout(fig[1, 1])
+for (col, (Nx, letter)) in enumerate(zip((128, 256, 512), "abc"))
+    domain!(scaled_axis3(squares[1, col], "($letter) $(Nx)²", Nx / 600, Nx / 600, 1, scale), 1, Nx / 600, Nx / 600;
+            gap = 0)
 end
-x = 0.0
-for Nx in (128, 512)
-    o = Point3f(x, 0, 0)
-    global x += domain!(ax, o, 1, Nx * Δ, 32Δ, Δ; gap = 0, Lz) + 40Δ
-    label!(ax, o + Point3f(0, 32Δ, Lz), "$Nx × 32"; align = (:left, :bottom))
-end
-limits!(ax, 0, x - 40Δ, -front_offset * Lz, 128Δ, 0, 0.3 + Lz)
-
-spacing = Axis(fig[1, 2]; title = "(b) Vertical grid spacing", titlesize = 9, titlegap = 2, xlabel = "Δz", ylabel = "z",
-               xscale = log10, yticks = 0:0.5:1, xgridvisible = false, ygridvisible = false,
-               xticks = ([2e-4, 5e-4, 1e-3, 2e-3], ["2×10⁻⁴", "5×10⁻⁴", "10⁻³", "2×10⁻³"]))
-for (grid, (Nz, color)) in zip(GRID_TYPES, ((600, 1), (2400, 2), (2400, 3)))
+spacing = Axis(fig[1, 2]; title = "(d) Vertical grid spacing", titlesize = 9, titlealign = :left, titlegap = 2,
+               xlabel = "Δz", ylabel = "z", xscale = log10, yticks = 0:0.5:1, xgridvisible = false, ygridvisible = false,
+               xticks = ([2e-4, 5e-4, 1e-3, 2e-3], ["2×10⁻⁴", "5×10⁻⁴", "10⁻³", "2×10⁻³"]), height = 110)
+for (grid, (Nz, color, side)) in zip(GRID_TYPES, ((600, 1, -1), (2400, 2, -1), (2400, 3, 1)))
     z = grid == "stretched" ? stretched_z_faces(Nz, 1) : range(0, 1, length = Nz + 1)
     Δz = diff(z)
     lines!(spacing, Δz, (z[1:end-1] .+ z[2:end]) ./ 2; color = Makie.wong_colors()[color])
-    text!(spacing, maximum(Δz), 0.5; text = grid, rotation = π / 2, align = (:center, :bottom), fontsize = 7,
-          offset = (-2, 0), color = Makie.wong_colors()[color])
+    text!(spacing, maximum(Δz), 0.5; text = "$grid, Nz = $Nz", rotation = π / 2, fontsize = 7, offset = (2side, 0),
+          align = (:center, side < 0 ? :bottom : :top), color = Makie.wong_colors()[color])
 end
 limits!(spacing, 1.5e-4, 2.5e-3, 0, 1)
-buoyancy_colorbar(fig[2, 1]; vertical = false, flipaxis = false, width = Relative(0.5), height = 6)
-colsize!(fig.layout, 2, Relative(0.3))
+
+strips = GridLayout(fig[2, 1:2])
+for (col, (Nx, letter)) in enumerate(zip((512, 2048), "ef"))
+    domain!(scaled_axis3(strips[1, col], "($letter) $Nx × 32", Nx / 600, 32 / 600, 1, scale), 1, Nx / 600, 32 / 600;
+            gap = 0)
+end
+buoyancy_colorbar(fig[1:2, 3]; width = 6, height = Relative(0.6))
+wall_panels!(fig[3, 1:3], "gh")
+Label(fig[0, :], "One H100: squares Nx² × 600 and strips Nx × 32 × 600 at Δx = Δy = 1/600", font = :bold,
+      fontsize = 9, halign = :left)
+rowgap!(fig.layout, 8)
+resize_to_layout!(fig)
 
 save("./Output/single_H100_setup.pdf", fig, pt_per_unit = 1)
 save("./Output/single_H100_setup.png", fig, px_per_unit = 6)
