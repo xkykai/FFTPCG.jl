@@ -1,5 +1,6 @@
 using CairoMakie
 using Makie
+using LinearAlgebra: ⋅
 
 include("../benchmarks/rough_rayleigh_benard_setup.jl")
 
@@ -26,7 +27,7 @@ function scaled_axis3(position, title, Lx, Ly, Lz, scale; azimuth = azimuth, ele
     width, height = projected_size(Lx, Ly, Lz; azimuth, elevation) .* scale
     ax = Axis3(position; title, width, height, azimuth, elevation, perspectiveness = 0, aspect = :data,
                viewmode = :fitzoom, protrusions = (0, 0, 0, 12), titlesize = 9, titlealign = :left, titlegap = 2,
-               halign = :left)
+               halign = :left, valign = :bottom)
     hidedecorations!(ax)
     hidespines!(ax)
     limits!(ax, 0, Lx, 0, Ly, 0, Lz)
@@ -68,28 +69,40 @@ end
 """
     walls!(ax; gap)
 
-Solid cells of the bottom and top walls under 2 × 2 pyramids, `gap` grid spacings apart, in grid spacings.
+Solid cells of the bottom and top walls under 2 × 2 pyramids, `gap` grid spacings apart, in grid spacings. The top of
+the top wall is see-through.
 """
 function walls!(ax; gap)
     n = 32
     H = [count(k -> k - 0.5 <= pyramid(i - 0.5, j - 0.5), 1:8) for i in 1:n, j in 1:n]
     height(i, j) = 1 <= i <= n && 1 <= j <= n ? H[i, j] : 0
     top = 16 + gap
-    faces = [1 2 3; 1 3 4]
-    quad!(points, shade) = mesh!(ax, Point3f.(points), faces; color = gray(shade), shading = NoShading)
 
-    # Back to front, drawing only the faces in contact with the fluid
-    a = ax.azimuth[]
-    order = sort(vec(collect(Iterators.product(1:n, 1:n))), by = ((i, j),) -> cos(a) * i + sin(a) * j)
-    for flip in (false, true), (i, j) in order
+    # Faces in contact with the fluid
+    quads = Tuple{Vector{Point3f}, Symbol}[]
+    for flip in (false, true), i in 1:n, j in 1:n
         x₀, x₁, y₀, y₁ = i - 1, i, j - 1, j
         z(h) = flip ? top - h : h
-        h, hy, hx = H[i, j], height(i, j - 1), height(i - 1, j)
-        flip || quad!([(x₀, y₀, h), (x₁, y₀, h), (x₁, y₁, h), (x₀, y₁, h)], :gray88)
-        hy < h && quad!([(x₀, y₀, z(hy)), (x₁, y₀, z(hy)), (x₁, y₀, z(h)), (x₀, y₀, z(h))], :gray55)
-        hx < h && quad!([(x₀, y₀, z(hx)), (x₀, y₁, z(hx)), (x₀, y₁, z(h)), (x₀, y₀, z(h))], :gray72)
+        h = H[i, j]
+        push!(quads, (Point3f[(x₀, y₀, z(h)), (x₁, y₀, z(h)), (x₁, y₁, z(h)), (x₀, y₁, z(h))], flip ? :gray80 : :gray88))
+        for (hn, side, shade) in ((height(i, j - 1), [(x₀, y₀), (x₁, y₀)], :gray55), (height(i - 1, j), [(x₀, y₀), (x₀, y₁)], :gray72),
+                                  (height(i, j + 1), [(x₀, y₁), (x₁, y₁)], :gray62), (height(i + 1, j), [(x₁, y₀), (x₁, y₁)], :gray66))
+            hn < h || continue
+            (a, b), (c, d) = side
+            push!(quads, (Point3f[(a, b, z(hn)), (c, d, z(hn)), (c, d, z(h)), (a, b, z(h))], shade))
+        end
     end
-    quad!([(0, 0, top), (n, 0, top), (n, n, top), (0, n, top)], :gray88)
+
+    # Far to near along the line of sight
+    e, a = ax.elevation[], ax.azimuth[]
+    view = Point3f(cos(e) * cos(a), cos(e) * sin(a), sin(e))
+    faces = [1 2 3; 1 3 4]
+    for (points, shade) in sort(quads, by = ((points, _),) -> sum(points) ⋅ view)
+        mesh!(ax, points, faces; color = gray(shade), shading = NoShading)
+    end
+    lid = Point3f[(0, 0, top), (n, 0, top), (n, n, top), (0, n, top)]
+    mesh!(ax, lid, faces; color = (:gray70, 0.25), shading = NoShading)
+    lines!(ax, [lid; lid[1:1]]; color = :gray40, linewidth = 0.5)
     return nothing
 end
 
@@ -121,15 +134,17 @@ function cells!(position, title)
     return nothing
 end
 
-"The immersed walls in 3D and the solid cells through the pyramid apexes, with panels lettered from `letters`."
+"The immersed walls under 2 × 2 pyramids in 3D and in an x-z cross-section, with panels lettered from `letters`."
 function wall_panels!(position, letters)
     layout = GridLayout(position)
     gap = 6
-    ax = scaled_axis3(layout[1, 1], "($(letters[1])) Bottom and top walls, 2 × 2 pyramids", 32, 32, 16 + gap, 3.4;
-                      azimuth = 1.32π, elevation = 0.1π)
+    Label(layout[0, 1:2], "Immersed bottom and top walls, 2 × 2 pyramids"; font = :bold, halign = :left)
+    ax = scaled_axis3(layout[1, 1], "($(letters[1])) 3D view, top wall see-through", 32, 32, 16 + gap, 3.4;
+                      azimuth = 1.32π, elevation = 0.12π)
     walls!(ax; gap)
-    cells!(layout[1, 2], "($(letters[2])) Solid cells through the apexes")
+    cells!(layout[1, 2], "($(letters[2])) x–z cross-section through the apexes")
     colgap!(layout, 20)
+    rowgap!(layout, 2)
     return layout
 end
 
@@ -142,15 +157,16 @@ fig = Figure(fontsize = 9, figure_padding = (4, 8, 4, 4))
 scale = 48
 gap = 0.15
 
-small = GridLayout(fig[1, 1]; halign = :left)
+small = GridLayout(fig[1, 1]; halign = :center)
 for (n, letter, position) in ((1, 'a', small[1, 1]), (4, 'b', small[1, 2]), (8, 'c', fig[2, 1]))
-    title = "($letter) $n GPU$(n > 1 ? "s" : "")"
-    domain!(scaled_axis3(position, title, n + (n - 1) * gap, 1, 1, scale), n, n, 1; gap)
+    title = "($letter) $n GPU$(n > 1 ? "s" : ""), " * (n == 1 ? "448³" : "$(448n) × 448²")
+    ax = scaled_axis3(position, title, n + (n - 1) * gap, 1, 1, scale)
+    ax.halign = :center
+    domain!(ax, n, n, 1; gap)
 end
-colgap!(small, 16)
+colgap!(small, 30)
 buoyancy_colorbar(fig[1:2, 2]; width = 6, height = Relative(0.7))
 wall_panels!(fig[3, 1:2], "de")
-Label(fig[0, :], "Weak scaling: 448³ points per GPU, Lx = number of GPUs", font = :bold, fontsize = 9, halign = :left)
 rowgap!(fig.layout, 8)
 resize_to_layout!(fig)
 
@@ -162,49 +178,51 @@ fig = Figure(fontsize = 9, figure_padding = (4, 8, 4, 4))
 scale = 105
 
 for (col, (n, gap, letter)) in enumerate(zip((1, 4, 8), (0, 0.06, 0.04), "abc"))
-    title = "($letter) $n GPU$(n > 1 ? "s" : "")" * (n > 1 ? ", $(448 ÷ n) × 448² each" : "")
+    title = "($letter) $n GPU$(n > 1 ? "s" : ""), " * (n == 1 ? "448³" : "$(448 ÷ n) × 448² each")
     domain!(scaled_axis3(fig[1, col], title, 1 + (n - 1) * gap, 1, 1, scale), n, 1, 1; gap)
 end
 buoyancy_colorbar(fig[1, 4]; width = 6, height = Relative(0.8))
 wall_panels!(fig[2, 1:4], "de")
-Label(fig[0, :], "Strong scaling: 448³ points in total", font = :bold, fontsize = 9, halign = :left)
 rowgap!(fig.layout, 8)
 resize_to_layout!(fig)
 
 save("./Output/strongscaling_setup.pdf", fig, pt_per_unit = 1)
 save("./Output/strongscaling_setup.png", fig, px_per_unit = 6)
 
-#%% One H100: squares Nx × Nx × 600 and strips Nx × 32 × 600, all with Δx = Δy = Δz = 1/600
+#%% One H100: squares and strips with Δx = Δy = 1/600 and 600 points in z
 fig = Figure(fontsize = 9, figure_padding = (4, 8, 4, 4))
 scale = 100
 
-squares = GridLayout(fig[1, 1])
-for (col, (Nx, letter)) in enumerate(zip((128, 256, 512), "abc"))
-    domain!(scaled_axis3(squares[1, col], "($letter) $(Nx)²", Nx / 600, Nx / 600, 1, scale), 1, Nx / 600, Nx / 600;
-            gap = 0)
+squares = GridLayout(fig[1, 1]; halign = :left, valign = :bottom)
+Label(squares[0, 1:3], "Squares, (Nx, Ny, Nz) = (N, N, 600)"; font = :bold, halign = :left)
+for (col, (N, letter)) in enumerate(zip((128, 256, 512), "abc"))
+    ax = scaled_axis3(squares[1, col], "($letter) N = $N", N / 600, N / 600, 1, scale; azimuth = 1.3π, elevation = 0.2π)
+    domain!(ax, 1, N / 600, N / 600; gap = 0)
 end
+colgap!(squares, 24)
+rowgap!(squares, 2)
 spacing = Axis(fig[1, 2]; title = "(d) Vertical grid spacing", titlesize = 9, titlealign = :left, titlegap = 2,
                xlabel = "Δz", ylabel = "z", xscale = log10, yticks = 0:0.5:1, xgridvisible = false, ygridvisible = false,
-               xticks = ([2e-4, 5e-4, 1e-3, 2e-3], ["2×10⁻⁴", "5×10⁻⁴", "10⁻³", "2×10⁻³"]), height = 110)
+               xticks = ([2e-4, 5e-4, 1e-3, 2e-3], ["2×10⁻⁴", "5×10⁻⁴", "10⁻³", "2×10⁻³"]), height = 130)
 for (grid, (Nz, color, side)) in zip(GRID_TYPES, ((600, 1, -1), (2400, 2, -1), (2400, 3, 1)))
     z = grid == "stretched" ? stretched_z_faces(Nz, 1) : range(0, 1, length = Nz + 1)
     Δz = diff(z)
     lines!(spacing, Δz, (z[1:end-1] .+ z[2:end]) ./ 2; color = Makie.wong_colors()[color])
-    text!(spacing, maximum(Δz), 0.5; text = "$grid, Nz = $Nz", rotation = π / 2, fontsize = 7, offset = (2side, 0),
+    text!(spacing, maximum(Δz), 0.5; text = "$grid, Nz = $Nz", rotation = π / 2, fontsize = 9, offset = (2side, 0),
           align = (:center, side < 0 ? :bottom : :top), color = Makie.wong_colors()[color])
 end
 limits!(spacing, 1.5e-4, 2.5e-3, 0, 1)
 
-strips = GridLayout(fig[2, 1:2])
+strips = GridLayout(fig[2, 1:2]; halign = :left)
+Label(strips[0, 1:2], "Strips, (Nx, Ny, Nz) = (Nx, 32, 600)"; font = :bold, halign = :left)
 for (col, (Nx, letter)) in enumerate(zip((512, 2048), "ef"))
-    domain!(scaled_axis3(strips[1, col], "($letter) $Nx × 32", Nx / 600, 32 / 600, 1, scale), 1, Nx / 600, 32 / 600;
-            gap = 0)
+    ax = scaled_axis3(strips[1, col], "($letter) (Nx, Ny) = ($Nx, 32)", Nx / 600, 32 / 600, 1, scale)
+    domain!(ax, 1, Nx / 600, 32 / 600; gap = 0)
 end
+rowgap!(strips, 2)
 buoyancy_colorbar(fig[1:2, 3]; width = 6, height = Relative(0.6))
 wall_panels!(fig[3, 1:3], "gh")
-Label(fig[0, :], "One H100: squares Nx² × 600 and strips Nx × 32 × 600 at Δx = Δy = 1/600", font = :bold,
-      fontsize = 9, halign = :left)
-rowgap!(fig.layout, 8)
+rowgap!(fig.layout, 10)
 resize_to_layout!(fig)
 
 save("./Output/single_H100_setup.pdf", fig, pt_per_unit = 1)
