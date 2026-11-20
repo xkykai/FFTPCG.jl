@@ -211,10 +211,7 @@ end
 colgap!(strips, 24)
 rowgap!(strips, 8)
 buoyancy_colorbar(fig[1:2, 2]; width = 6, height = Relative(0.6))
-Label(fig[3, 1], "The anisotropic and stretched grids use (N, N, 2400) squares and (Nx, 16, 2400) strips at the same Δx = Δy";
-      fontsize = 8, halign = :left, tellwidth = false)
 rowgap!(fig.layout, 24)
-rowgap!(fig.layout, 2, 8)
 resize_to_layout!(fig)
 
 save("./Output/single_H100_setup.pdf", fig, pt_per_unit = 1)
