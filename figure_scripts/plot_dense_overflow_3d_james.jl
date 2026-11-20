@@ -80,10 +80,8 @@ let
 
     for (q, t) in enumerate(snapshot_times)
         plume = plume_surface(findfirst(≈(t), fields.c.times))
-        labelled = q == 3
-        label_kw = (; (Symbol(dimension, name) => labelled for dimension in "xyz" for name in (:labelvisible, :ticklabelsvisible))...)
 
-        ax = Axis3(fig[(q + 1) ÷ 2, 2 - q % 2]; axis_kw..., label_kw...,
+        ax = Axis3(fig[(q + 1) ÷ 2, 2 - q % 2]; axis_kw...,
                    title = rich(rich("($(letters[q])) "; font=:bold), "t = $(round(Int, t / day)) days"),
                    titlefont = :regular,
                    titlealign = :left,
@@ -92,17 +90,17 @@ let
                    ylabel = "y (km)",
                    zlabel = "z (km)",
                    xticks = -500:250:0,
-                   yticks = -200:200:0,
-                   zticks = -3:3:0,
+                   yticks = -200:100:0,
+                   zticks = -3:1:0,
                    aspect = (1, grid.Ly / grid.Lx, 0.18),
                    limits = (extrema(x), extrema(y), (-3.3, 0)),
                    azimuth = -0.6π,
                    elevation = 0.14π,
                    perspectiveness = 0.3,
                    protrusions = (30, 4, 16, 10),
-                   xlabeloffset = 16,
-                   ylabeloffset = 24,
-                   zlabeloffset = 18)
+                   xlabeloffset = 20,
+                   ylabeloffset = 30,
+                   zlabeloffset = 24)
 
         surface!(ax, x, y, bottom_height; color=zeros(Nx, Ny), colormap=[:gray78, :gray78], rasterize=5)
         surface!(ax, x, y, plume.height; color=plume.buoyancy .* 1e3, buoyancy_kw..., rasterize=5)
