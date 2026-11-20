@@ -192,7 +192,7 @@ scale = 110
 Δ = 1 / 600
 
 squares = GridLayout(fig[1, 1])
-Label(squares[0, 1:3], "Squares, (Nx, Ny, Nz) = (N, N, 600)"; font = :bold, fontsize = 11, tellwidth = false)
+Label(squares[0, 1:3], "Squares, (Nx, Ny, Nz) = (N, N, 600) on the isotropic grid"; font = :bold, fontsize = 11, tellwidth = false)
 for (col, (N, letter)) in enumerate(zip((128, 256, 512), "abc"))
     ax = scaled_axis3(squares[1, col], "($letter) N = $N", N * Δ, N * Δ, 1, scale; azimuth = 1.3π, elevation = 0.2π)
     ax.titlefont = :regular
@@ -202,7 +202,7 @@ colgap!(squares, 24)
 rowgap!(squares, 8)
 
 strips = GridLayout(fig[2, 1])
-Label(strips[0, 1:2], "Strips, (Nx, Ny, Nz) = (Nx, 32, 600)"; font = :bold, fontsize = 11, tellwidth = false)
+Label(strips[0, 1:2], "Strips, (Nx, Ny, Nz) = (Nx, 32, 600) on the isotropic grid"; font = :bold, fontsize = 11, tellwidth = false)
 for (col, (Nx, letter)) in enumerate(zip((512, 2048), "de"))
     ax = scaled_axis3(strips[1, col], "($letter) (Nx, Ny) = ($Nx, 32)", Nx * Δ, 32Δ, 1, scale; elevation = 0.2π)
     ax.titlefont = :regular
@@ -211,7 +211,10 @@ end
 colgap!(strips, 24)
 rowgap!(strips, 8)
 buoyancy_colorbar(fig[1:2, 2]; width = 6, height = Relative(0.6))
+Label(fig[3, 1], "The anisotropic and stretched grids use (N, N, 2400) squares and (Nx, 16, 2400) strips at the same Δx = Δy";
+      fontsize = 8, halign = :left, tellwidth = false)
 rowgap!(fig.layout, 24)
+rowgap!(fig.layout, 2, 8)
 resize_to_layout!(fig)
 
 save("./Output/single_H100_setup.pdf", fig, pt_per_unit = 1)
@@ -230,8 +233,8 @@ spacing = Axis(fig[1, 3]; title = "(c) Vertical grid spacing", titlesize = 9, ti
                xlabel = "Δz / Δx", ylabel = "z", xscale = log10, yticks = 0:0.5:1, xgridvisible = false,
                ygridvisible = false, xticks = ([0.1, 0.25, 0.5, 1], ["0.1", "0.25", "0.5", "1"]), width = 150,
                height = 150)
-for (grid, (shape, Nz, color, side)) in zip(GRID_TYPES, (("N × N × N", 600, 1, -1), ("N/2 × N/2 × 4N", 2400, 2, -1),
-                                                          ("N/2 × N/2 × 4N", 2400, 3, 1)))
+for (grid, (shape, Nz, color, side)) in zip(GRID_TYPES, (("Nz = N", 600, 1, -1), ("Nz = 4N", 2400, 2, -1),
+                                                          ("Nz = 4N", 2400, 3, 1)))
     N = grid == "isotropic" ? Nz : Nz ÷ 4
     z = grid == "stretched" ? stretched_z_faces(Nz, 1) : range(0, 1, length = Nz + 1)
     ratio = diff(z) .* N
