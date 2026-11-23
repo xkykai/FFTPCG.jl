@@ -58,7 +58,7 @@ function block!(ax, x₀, x₁, Lx, Ly; shift, Δ = nothing)
                 append!(colors, fill(gray(shade), 3))
             end
         end
-        mesh!(ax, points, reshape(1:length(points), 3, :)'; color = colors, shading = NoShading, rasterize = 5)
+        mesh!(ax, points, reshape(1:length(points), 3, :)'; color = colors, shading = NoShading, rasterize = 10)
     end
     contourf!(ax, x .+ shift, z, buoyancy.(x, z', Lx); colormap, levels, transformation = (:xz, 0))
     contourf!(ax, [0, Ly], z, repeat(buoyancy.(x₀, z', Lx), 2); colormap, levels, transformation = (:yz, X₀))
