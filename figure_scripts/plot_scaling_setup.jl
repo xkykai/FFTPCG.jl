@@ -110,10 +110,12 @@ function walls!(ax; gap)
     # Far to near along the line of sight
     e, a = ax.elevation[], ax.azimuth[]
     view = Point3f(cos(e) * cos(a), cos(e) * sin(a), sin(e))
+    sorted = sort(quads, by = ((points, _),) -> sum(points) ⋅ view)
+    points = reduce(vcat, first.(sorted))
+    colors = [gray(shade) for (_, shade) in sorted for _ in 1:4]
+    triangles = reduce(vcat, [4k+1 4k+2 4k+3; 4k+1 4k+3 4k+4] for k in 0:length(sorted)-1)
+    mesh!(ax, points, triangles; color = colors, shading = NoShading, rasterize = 5)
     faces = [1 2 3; 1 3 4]
-    for (points, shade) in sort(quads, by = ((points, _),) -> sum(points) ⋅ view)
-        mesh!(ax, points, faces; color = gray(shade), shading = NoShading)
-    end
     lid = Point3f[(0, 0, top), (n, 0, top), (n, n, top), (0, n, top)]
     mesh!(ax, lid, faces; color = (:gray70, 0.25), shading = NoShading)
     lines!(ax, [lid; lid[1:1]]; color = :gray40, linewidth = 0.5)
